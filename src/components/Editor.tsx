@@ -67,10 +67,29 @@ const TEMPLATES: Record<string, {
 
 const FIELD_KEYS = ['topline', 'intro', 'name', 'subtitle', 'date', 'program', 'greeting', 'rsvp'];
 
+const DEFAULT_MODULE_ORDER = [
+  'topline', 'divider1', 'intro', 'name', 'subtitle',
+  'datebadge', 'divider2', 'program', 'divider3', 'greeting', 'rsvp'
+];
+
+const MODULE_LABELS: Record<string, string> = {
+  topline: 'Topplinje', divider1: '── Skillelinje 1',
+  intro: 'Innledning', name: 'Navn', subtitle: 'Undertittel',
+  datebadge: 'Dato-badge', divider2: '── Skillelinje 2',
+  program: 'Program', divider3: '── Skillelinje 3',
+  greeting: 'Hilsen', rsvp: 'RSVP',
+};
+
 export default function Editor() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [saveVersion, setSaveVersion] = useState(0);
   const [saveEnabled, setSaveEnabled] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState('default');
+  const [projectNameInput, setProjectNameInput] = useState('');
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<{ id: string; updated_at: string }[]>([]);
+  const currentProjectIdRef = useRef('default');
+  currentProjectIdRef.current = currentProjectId;
 
   const triggerSave = useCallback(() => {
     setSaveVersion(v => v + 1);
@@ -79,7 +98,7 @@ export default function Editor() {
   const handleSave = useCallback(async () => {
     const state = collectState();
     await supabase.from('invitation_state').upsert({
-      id: 'default',
+      id: currentProjectIdRef.current,
       state,
       updated_at: new Date().toISOString(),
     });
@@ -93,7 +112,6 @@ export default function Editor() {
   });
 
   useEffect(() => {
-    // Wait for DOM to be ready (container renders the HTML via dangerouslySetInnerHTML)
     const timer = setTimeout(() => {
       initEditor();
       loadFromSupabase();
@@ -108,12 +126,54 @@ export default function Editor() {
       .select('state')
       .eq('id', 'default')
       .single();
+    if (data?.state) applyProjectData(data.state);
+    setSaveEnabled(true);
+  }
 
+  async function saveNamedProject(name: string) {
+    const id = name.trim() || 'default';
+    const state = collectState();
+    const { error } = await supabase.from('invitation_state').upsert({
+      id,
+      state,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) { showToast('Lagringsfeil: ' + error.message); return; }
+    setCurrentProjectId(id);
+    showToast(`Lagret som "${id}"!`);
+    triggerSave();
+  }
+
+  async function loadProjectList() {
+    const { data } = await supabase
+      .from('invitation_state')
+      .select('id, updated_at')
+      .order('updated_at', { ascending: false });
+    setSavedProjects(data || []);
+  }
+
+  async function openNamedProject(id: string) {
+    setSaveEnabled(false);
+    const { data } = await supabase
+      .from('invitation_state')
+      .select('state')
+      .eq('id', id)
+      .single();
     if (data?.state) {
       applyProjectData(data.state);
+      setCurrentProjectId(id);
+      setProjectNameInput(id === 'default' ? '' : id);
     }
-    // Enable autosave after initial load
-    setSaveEnabled(true);
+    setShowProjectModal(false);
+    setTimeout(() => setSaveEnabled(true), 500);
+    showToast(`Åpnet "${id}"!`);
+  }
+
+  async function deleteNamedProject(id: string) {
+    if (!confirm(`Slett prosjektet "${id}"?`)) return;
+    await supabase.from('invitation_state').delete().eq('id', id);
+    setSavedProjects(prev => prev.filter(p => p.id !== id));
+    if (id === currentProjectId) setCurrentProjectId('default');
   }
 
   function initEditor() {
@@ -189,6 +249,10 @@ export default function Editor() {
     w.loadProject = loadProject;
     w.downloadPDF = downloadPDF;
     w.downloadPNG = downloadPNG;
+    w.triggerSave = triggerSave;
+
+    // Init module order UI
+    renderModuleOrderUI(triggerSave);
   }
 
   // Editor state (module-level for vanilla JS functions)
@@ -350,6 +414,20 @@ export default function Editor() {
 
           {/* DESIGN TAB */}
           <div className="tab-panel" id="panel-design">
+
+            <div className="accordion">
+              <div className="accordion-header" onClick={(e) => toggleAccordion(e.currentTarget)}>
+                <span className="acc-title">Rekkefølge på innhold</span><span className="chevron">▼</span>
+              </div>
+              <div className="accordion-body">
+                <div style={{padding:'6px 14px 4px',fontSize:'10px',color:'var(--text-muted)'}}>
+                  Dra og slipp for å endre rekkefølge på kortet.
+                </div>
+                <div id="module-order-list"></div>
+              </div>
+            </div>
+
+            <div className="sep"></div>
             <div className="section-label">Kortbakgrunn</div>
             <div className="ctrl-row">
               <label>Bakgrunnsfarge</label>
@@ -442,10 +520,26 @@ export default function Editor() {
         </div>
 
         <div id="save-section">
-          <div className="save-row">
-            <button className="btn btn-secondary" style={{flex:1}} onClick={saveProject}>💾 Lagre (lokal)</button>
-            <button className="btn btn-secondary" style={{flex:1}} onClick={loadProject}>📂 Åpne (lokal)</button>
+          <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'4px',letterSpacing:'0.5px'}}>
+            {currentProjectId !== 'default' ? `Prosjekt: ${currentProjectId}` : 'Prosjekt: (standard)'}
           </div>
+          <div className="save-row" style={{marginBottom:'6px'}}>
+            <input
+              type="text"
+              value={projectNameInput}
+              onChange={e => setProjectNameInput(e.target.value)}
+              placeholder="Prosjektnavn..."
+              style={{flex:1,background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text-primary)',padding:'7px 10px',fontSize:'12px',fontFamily:'inherit',outline:'none'}}
+            />
+            <button className="btn btn-primary" style={{marginLeft:'6px',fontSize:'12px',padding:'7px 12px',whiteSpace:'nowrap'}}
+              onClick={() => saveNamedProject(projectNameInput || currentProjectId)}>
+              Lagre
+            </button>
+          </div>
+          <button className="btn btn-secondary btn-full" style={{marginBottom:'6px',fontSize:'12px'}}
+            onClick={async () => { await loadProjectList(); setShowProjectModal(true); }}>
+            📂 Åpne prosjekt...
+          </button>
           <button className="btn btn-primary btn-full" onClick={downloadPDF}>⬇ Last ned PDF (A5)</button>
           <button className="btn btn-secondary btn-full" onClick={downloadPNG}>🖼 Lagre PNG</button>
         </div>
@@ -470,6 +564,29 @@ export default function Editor() {
       </div>
 
       <div id="toast"></div>
+
+      {showProjectModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}} onClick={() => setShowProjectModal(false)}>
+          <div style={{background:'var(--sidebar-bg)',border:'1px solid var(--border)',borderRadius:'12px',padding:'24px',minWidth:'320px',maxWidth:'480px',width:'90%',maxHeight:'70vh',overflow:'auto'}} onClick={e => e.stopPropagation()}>
+            <div style={{fontSize:'11px',letterSpacing:'2px',textTransform:'uppercase',color:'var(--accent)',fontWeight:700,marginBottom:'16px'}}>Lagrede prosjekter</div>
+            {savedProjects.length === 0 ? (
+              <div style={{color:'var(--text-muted)',fontSize:'12px'}}>Ingen lagrede prosjekter ennå.</div>
+            ) : (
+              savedProjects.map(p => (
+                <div key={p.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'13px',color:'var(--text-primary)',fontWeight:600}}>{p.id}</div>
+                    <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{new Date(p.updated_at).toLocaleString('no-NO')}</div>
+                  </div>
+                  <button className="btn btn-primary" style={{fontSize:'11px',padding:'5px 10px'}} onClick={() => openNamedProject(p.id)}>Åpne</button>
+                  <button className="btn btn-danger" style={{fontSize:'11px',padding:'5px 10px'}} onClick={() => deleteNamedProject(p.id)}>Slett</button>
+                </div>
+              ))
+            )}
+            <button className="btn btn-secondary btn-full" style={{marginTop:'16px',fontSize:'12px'}} onClick={() => setShowProjectModal(false)}>Lukk</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -605,6 +722,7 @@ const editorState = {
   bgColorForRemoval: null as string | null,
   rsvpTransparent: false,
   fields: Object.fromEntries(FIELD_KEYS.map(k => [k, { bold: false, italic: k === 'intro' || k === 'subtitle' }])),
+  moduleOrder: [...DEFAULT_MODULE_ORDER],
 };
 
 function g(id: string): HTMLInputElement {
@@ -664,6 +782,48 @@ function buildContent() {
     _buildContentNow();
   }, 16); // one frame debounce
 }
+function renderModule(key: string, f: Record<string, {
+  text: string; font: string; size: number; color: string;
+  bold: boolean; italic: boolean; spacing: number; lh: number;
+}>, divColor: string, divW: string, badgeBg: string, badgeRadius: string): string {
+  const fw = (k: string) => f[k]?.bold ? '700' : '400';
+  const fi = (k: string) => f[k]?.italic ? 'italic' : 'normal';
+
+  switch (key) {
+    case 'topline':
+      return `<div class="card-topline" style="font-family:'${f.topline.font}',sans-serif;font-size:${f.topline.size}px;color:${f.topline.color};font-weight:${fw('topline')};font-style:${fi('topline')};letter-spacing:${f.topline.spacing}px;text-transform:uppercase;padding:0 20px;">${f.topline.text}</div>`;
+    case 'divider1':
+    case 'divider2':
+    case 'divider3':
+      return `<hr class="card-divider" style="border-top:${divW}px solid ${divColor};margin:${key === 'divider1' ? '10px' : '6px'} auto;">`;
+    case 'intro':
+      return `<div class="card-intro" style="font-family:'${f.intro.font}',serif;font-size:${f.intro.size}px;color:${f.intro.color};font-weight:${fw('intro')};font-style:${fi('intro')};letter-spacing:${f.intro.spacing}px;margin-bottom:4px;">${f.intro.text}</div>`;
+    case 'name':
+      return `<div class="card-name" style="font-family:'${f.name.font}',serif;font-size:${f.name.size}px;color:${f.name.color};font-weight:${fw('name')};font-style:${fi('name')};letter-spacing:${f.name.spacing}px;line-height:1.1;margin-bottom:6px;padding:0 16px;">${f.name.text}</div>`;
+    case 'subtitle':
+      return `<div class="card-subtitle" style="font-family:'${f.subtitle.font}',serif;font-size:${f.subtitle.size}px;color:${f.subtitle.color};font-weight:${fw('subtitle')};font-style:${fi('subtitle')};letter-spacing:${f.subtitle.spacing}px;margin-bottom:10px;">${f.subtitle.text}</div>`;
+    case 'datebadge':
+      return `<div class="card-date-badge" style="background:${badgeBg};border-radius:${badgeRadius}px;padding:6px 22px;margin-bottom:10px;"><span style="font-family:'${f.date.font}',sans-serif;font-size:${f.date.size}px;color:${f.date.color};font-weight:${fw('date')};font-style:${fi('date')};letter-spacing:${f.date.spacing}px;">${f.date.text}</span></div>`;
+    case 'program':
+      return `<div class="card-program" style="font-family:'${f.program.font}',serif;font-size:${f.program.size}px;color:${f.program.color};font-weight:${fw('program')};font-style:${fi('program')};line-height:${f.program.lh};margin:8px 0;">${f.program.text.replace(/\n/g, '<br>')}</div>`;
+    case 'greeting':
+      return `<div class="card-greeting" style="font-family:'${f.greeting.font}',serif;font-size:${f.greeting.size}px;color:${f.greeting.color};font-weight:${fw('greeting')};font-style:${fi('greeting')};letter-spacing:${f.greeting.spacing}px;margin:6px 0;">${f.greeting.text}</div>`;
+    case 'rsvp': {
+      const rsvpVisible = (g('rsvp-visible') as HTMLInputElement)?.checked !== false;
+      if (!rsvpVisible) return '';
+      const rsvpBg = editorState.rsvpTransparent ? 'transparent' : (g('rsvp-bg')?.value || '#f0e8d8');
+      const rsvpBorderColor = g('rsvp-border-color')?.value || '#c8a068';
+      const rsvpBorderW = g('rsvp-border-w')?.value || '1';
+      const rsvpBorderStyle = g('rsvp-border-style')?.value || 'solid';
+      const rsvpRadius = g('rsvp-radius')?.value || '8';
+      const rsvpPadding = g('rsvp-padding')?.value || '12';
+      return `<div id="rsvp-box" style="background:${rsvpBg};border:${rsvpBorderW}px ${rsvpBorderStyle} ${rsvpBorderColor};border-radius:${rsvpRadius}px;padding:${rsvpPadding}px;margin:8px 40px 8px;text-align:center;width:calc(100% - 80px);"><div style="font-family:'${f.rsvp.font}',sans-serif;font-size:${f.rsvp.size}px;color:${f.rsvp.color};font-weight:${fw('rsvp')};font-style:${fi('rsvp')};line-height:${f.rsvp.lh};">${f.rsvp.text.replace(/\n/g, '<br>')}</div></div>`;
+    }
+    default:
+      return '';
+  }
+}
+
 function _buildContentNow() {
   const cl = document.getElementById('content-layer');
   if (!cl) return;
@@ -696,27 +856,9 @@ function _buildContentNow() {
   let html = `<div style="width:100%;display:flex;flex-direction:column;align-items:center;padding:0 0 16px;">`;
   html += `<div style="height:16px;"></div>`;
 
-  html += `<div class="card-topline" style="font-family:'${f.topline.font}',sans-serif;font-size:${f.topline.size}px;color:${f.topline.color};font-weight:${f.topline.bold ? '700' : '400'};font-style:${f.topline.italic ? 'italic' : 'normal'};letter-spacing:${f.topline.spacing}px;text-transform:uppercase;padding:0 20px;">${f.topline.text}</div>`;
-  html += `<hr class="card-divider" style="border-top:${divW}px solid ${divColor};margin:10px auto;">`;
-  html += `<div class="card-intro" style="font-family:'${f.intro.font}',serif;font-size:${f.intro.size}px;color:${f.intro.color};font-weight:${f.intro.bold ? '700' : '400'};font-style:${f.intro.italic ? 'italic' : 'normal'};letter-spacing:${f.intro.spacing}px;margin-bottom:4px;">${f.intro.text}</div>`;
-  html += `<div class="card-name" style="font-family:'${f.name.font}',serif;font-size:${f.name.size}px;color:${f.name.color};font-weight:${f.name.bold ? '700' : '400'};font-style:${f.name.italic ? 'italic' : 'normal'};letter-spacing:${f.name.spacing}px;line-height:1.1;margin-bottom:6px;padding:0 16px;">${f.name.text}</div>`;
-  html += `<div class="card-subtitle" style="font-family:'${f.subtitle.font}',serif;font-size:${f.subtitle.size}px;color:${f.subtitle.color};font-weight:${f.subtitle.bold ? '700' : '400'};font-style:${f.subtitle.italic ? 'italic' : 'normal'};letter-spacing:${f.subtitle.spacing}px;margin-bottom:10px;">${f.subtitle.text}</div>`;
-  html += `<div class="card-date-badge" style="background:${badgeBg};border-radius:${badgeRadius}px;padding:6px 22px;margin-bottom:10px;"><span style="font-family:'${f.date.font}',sans-serif;font-size:${f.date.size}px;color:${f.date.color};font-weight:${f.date.bold ? '700' : '400'};font-style:${f.date.italic ? 'italic' : 'normal'};letter-spacing:${f.date.spacing}px;">${f.date.text}</span></div>`;
-  html += `<hr class="card-divider" style="border-top:${divW}px solid ${divColor};margin:6px auto;">`;
-  html += `<div class="card-program" style="font-family:'${f.program.font}',serif;font-size:${f.program.size}px;color:${f.program.color};font-weight:${f.program.bold ? '700' : '400'};font-style:${f.program.italic ? 'italic' : 'normal'};line-height:${f.program.lh};margin:8px 0;">${f.program.text.replace(/\n/g, '<br>')}</div>`;
-  html += `<hr class="card-divider" style="border-top:${divW}px solid ${divColor};margin:6px auto;">`;
-  html += `<div class="card-greeting" style="font-family:'${f.greeting.font}',serif;font-size:${f.greeting.size}px;color:${f.greeting.color};font-weight:${f.greeting.bold ? '700' : '400'};font-style:${f.greeting.italic ? 'italic' : 'normal'};letter-spacing:${f.greeting.spacing}px;margin:6px 0;">${f.greeting.text}</div>`;
-
-  const rsvpVisible = (g('rsvp-visible') as HTMLInputElement)?.checked !== false;
-  if (rsvpVisible) {
-    const rsvpBg = editorState.rsvpTransparent ? 'transparent' : (g('rsvp-bg')?.value || '#f0e8d8');
-    const rsvpBorderColor = g('rsvp-border-color')?.value || '#c8a068';
-    const rsvpBorderW = g('rsvp-border-w')?.value || '1';
-    const rsvpBorderStyle = g('rsvp-border-style')?.value || 'solid';
-    const rsvpRadius = g('rsvp-radius')?.value || '8';
-    const rsvpPadding = g('rsvp-padding')?.value || '12';
-    html += `<div id="rsvp-box" style="background:${rsvpBg};border:${rsvpBorderW}px ${rsvpBorderStyle} ${rsvpBorderColor};border-radius:${rsvpRadius}px;padding:${rsvpPadding}px;margin:8px 40px 8px;text-align:center;width:calc(100% - 80px);"><div style="font-family:'${f.rsvp.font}',sans-serif;font-size:${f.rsvp.size}px;color:${f.rsvp.color};font-weight:${f.rsvp.bold ? '700' : '400'};font-style:${f.rsvp.italic ? 'italic' : 'normal'};line-height:${f.rsvp.lh};">${f.rsvp.text.replace(/\n/g, '<br>')}</div></div>`;
-  }
+  editorState.moduleOrder.forEach(key => {
+    html += renderModule(key, f, divColor, divW, badgeBg, badgeRadius);
+  });
 
   html += `</div>`;
   cl.innerHTML = html;
@@ -953,48 +1095,87 @@ async function removeBackgroundAPI() {
   }
 }
 
-// Smart fill: sample all 4 corners + a few edge midpoints, remove all matching pixels
+// BFS flood fill from all edge pixels — only removes background-connected regions,
+// preserving interior pixels that happen to match the background color (e.g. green jersey).
 function removeBackgroundSmartFill() {
   if (!editorState.cutoutOriginalSrc) { showToast('Last opp cutout-bilde først'); return; }
   const tolerance = parseInt(g('bg-tolerance')?.value || '40');
-  const img = document.getElementById('cutout-img') as HTMLImageElement;
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth || 400; canvas.height = img.naturalHeight || 400;
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(img, 0, 0);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  const w = canvas.width, h = canvas.height;
 
-  // Sample multiple seed points from edges
-  const seedPoints = [
-    [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
-    [Math.floor(w / 2), 0], [Math.floor(w / 2), h - 1],
-    [0, Math.floor(h / 2)], [w - 1, Math.floor(h / 2)],
-  ];
+  // Always work from the original source so repeated calls don't accumulate
+  const srcImg = new Image();
+  srcImg.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = srcImg.naturalWidth; canvas.height = srcImg.naturalHeight;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(srcImg, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const w = canvas.width, h = canvas.height;
 
-  // Collect reference bg colors from seeds
-  const bgColors: [number, number, number][] = seedPoints.map(([sx, sy]) => {
-    const idx = (sy * w + sx) * 4;
-    return [data[idx], data[idx + 1], data[idx + 2]];
-  });
+    // Sample seed colors from all 4 corners + 4 edge midpoints
+    const seedPoints = [
+      [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
+      [Math.floor(w / 2), 0], [Math.floor(w / 2), h - 1],
+      [0, Math.floor(h / 2)], [w - 1, Math.floor(h / 2)],
+    ];
+    const bgColors: [number, number, number][] = seedPoints.map(([sx, sy]) => {
+      const i = (sy * w + sx) * 4;
+      return [data[i], data[i + 1], data[i + 2]];
+    });
 
-  // For each pixel, check if it matches ANY seed color within tolerance
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], gv = data[i + 1], b = data[i + 2];
-    const matchesAny = bgColors.some(([bgR, bgG, bgB]) =>
-      Math.sqrt((r - bgR) ** 2 + (gv - bgG) ** 2 + (b - bgB) ** 2) < tolerance
-    );
-    if (matchesAny) data[i + 3] = 0;
-  }
+    function matchesBg(px: number): boolean {
+      const r = data[px], gv = data[px + 1], b = data[px + 2];
+      if (data[px + 3] === 0) return true; // already transparent
+      return bgColors.some(([bgR, bgG, bgB]) =>
+        Math.sqrt((r - bgR) ** 2 + (gv - bgG) ** 2 + (b - bgB) ** 2) < tolerance
+      );
+    }
 
-  ctx.putImageData(imageData, 0, 0);
-  const result = canvas.toDataURL('image/png');
-  editorState.cutoutImage = result;
-  img.src = result;
-  const thumb = document.getElementById('cutout-thumb') as HTMLImageElement;
-  if (thumb) thumb.src = result;
-  showToast('Bakgrunn fjernet! Prøv "Tilbakestill" og juster toleranse om nødvendig.');
+    // BFS: start queue from all edge pixels that match background
+    const visited = new Uint8Array(w * h);
+    const queue: number[] = [];
+
+    function enqueueEdge(x: number, y: number) {
+      const idx = y * w + x;
+      if (!visited[idx] && matchesBg(idx * 4)) {
+        visited[idx] = 1;
+        queue.push(idx);
+      }
+    }
+
+    for (let x = 0; x < w; x++) { enqueueEdge(x, 0); enqueueEdge(x, h - 1); }
+    for (let y = 1; y < h - 1; y++) { enqueueEdge(0, y); enqueueEdge(w - 1, y); }
+
+    // Flood fill — 4-connected
+    let qi = 0;
+    while (qi < queue.length) {
+      const idx = queue[qi++];
+      data[idx * 4 + 3] = 0; // make transparent
+      const x = idx % w, y = Math.floor(idx / w);
+      const neighbors = [
+        x > 0 ? idx - 1 : -1,
+        x < w - 1 ? idx + 1 : -1,
+        y > 0 ? idx - w : -1,
+        y < h - 1 ? idx + w : -1,
+      ];
+      for (const n of neighbors) {
+        if (n >= 0 && !visited[n] && matchesBg(n * 4)) {
+          visited[n] = 1;
+          queue.push(n);
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const result = canvas.toDataURL('image/png');
+    editorState.cutoutImage = result;
+    const img = document.getElementById('cutout-img') as HTMLImageElement;
+    img.src = result;
+    const thumb = document.getElementById('cutout-thumb') as HTMLImageElement;
+    if (thumb) thumb.src = result;
+    showToast('Bakgrunn fjernet! Prøv "Tilbakestill" og juster toleranse om nødvendig.');
+  };
+  srcImg.src = editorState.cutoutOriginalSrc;
 }
 
 function resetCutoutToOriginal() {
@@ -1258,6 +1439,70 @@ function applyTemplate(name: string) {
 }
 
 // ============================================================
+// MODULE ORDER DRAG-AND-DROP
+// ============================================================
+function renderModuleOrderUI(triggerSave?: () => void) {
+  const list = document.getElementById('module-order-list');
+  if (!list) return;
+  list.innerHTML = '';
+  editorState.moduleOrder.forEach((key, index) => {
+    const item = document.createElement('div');
+    item.className = 'module-drag-item';
+    item.setAttribute('draggable', 'true');
+    item.setAttribute('data-key', key);
+    item.setAttribute('data-index', String(index));
+    item.innerHTML = `<span class="drag-handle">⠿</span><span class="drag-label">${MODULE_LABELS[key] || key}</span>`;
+    list.appendChild(item);
+  });
+  attachDragHandlers(list, triggerSave);
+}
+
+function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
+  let dragSrc: HTMLElement | null = null;
+
+  list.querySelectorAll('.module-drag-item').forEach(item => {
+    const el = item as HTMLElement;
+
+    el.addEventListener('dragstart', (e: DragEvent) => {
+      dragSrc = el;
+      el.classList.add('dragging');
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setData('text/plain', el.getAttribute('data-index') || '');
+    });
+
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      list.querySelectorAll('.module-drag-item').forEach(i => (i as HTMLElement).classList.remove('drag-over'));
+    });
+
+    el.addEventListener('dragover', (e: DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'move';
+      list.querySelectorAll('.module-drag-item').forEach(i => (i as HTMLElement).classList.remove('drag-over'));
+      el.classList.add('drag-over');
+    });
+
+    el.addEventListener('drop', (e: DragEvent) => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === el) return;
+
+      const fromIdx = parseInt(dragSrc.getAttribute('data-index') || '0');
+      const toIdx = parseInt(el.getAttribute('data-index') || '0');
+
+      // Reorder
+      const newOrder = [...editorState.moduleOrder];
+      const [moved] = newOrder.splice(fromIdx, 1);
+      newOrder.splice(toIdx, 0, moved);
+      editorState.moduleOrder = newOrder;
+
+      renderModuleOrderUI(triggerSave);
+      buildContent();
+      if (triggerSave) triggerSave();
+    });
+  });
+}
+
+// ============================================================
 // COLLECT / APPLY STATE
 // ============================================================
 function collectState() {
@@ -1326,6 +1571,7 @@ function collectState() {
       rsvpTransparent: editorState.rsvpTransparent,
     },
     removebgKey: g('removebg-key')?.value,
+    moduleOrder: [...editorState.moduleOrder],
   };
 }
 
@@ -1451,6 +1697,11 @@ function applyProjectData(data: Record<string, unknown>) {
     updateCardBorder();
     updateGrass();
     updateOrnament();
+  }
+
+  if (data.moduleOrder && Array.isArray(data.moduleOrder)) {
+    editorState.moduleOrder = data.moduleOrder as string[];
+    renderModuleOrderUI();
   }
 
   buildContent();

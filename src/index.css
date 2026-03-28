@@ -167,6 +167,14 @@ body {
 .accordion-body { display: none; background: #13131f; border-top: 1px solid var(--border); padding: 8px 0 10px; }
 .accordion-body.open { display: block; }
 
+/* Module drag-to-reorder */
+.module-drag-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; cursor: grab; user-select: none; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background .15s; }
+.module-drag-item:hover { background: rgba(255,255,255,0.04); }
+.module-drag-item.dragging { opacity: 0.4; }
+.module-drag-item.drag-over { background: rgba(139,90,43,0.25); border-bottom-color: var(--accent); }
+.module-drag-item .drag-handle { font-size: 14px; color: var(--text-muted); cursor: grab; line-height: 1; }
+.module-drag-item .drag-label { font-size: 11px; color: var(--text-primary); }
+
 /* Font row (2-col) */
 .row2 { display: flex; gap: 8px; padding: 4px 14px; }
 .row2 > div { flex: 1; min-width: 0; }
