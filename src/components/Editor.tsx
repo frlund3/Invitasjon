@@ -78,6 +78,7 @@ const MODULE_LABELS: Record<string, string> = {
   datebadge: 'Dato-badge', divider2: '── Skillelinje 2',
   program: 'Program', divider3: '── Skillelinje 3',
   greeting: 'Hilsen', rsvp: 'RSVP',
+  portrait: 'Portrettbilde', grass: 'Gresstripe', cutout: 'Cutout-bilde',
 };
 
 export default function Editor() {
@@ -253,6 +254,13 @@ export default function Editor() {
 
     // Init module order UI
     renderModuleOrderUI(triggerSave);
+
+    applyAllPositions();
+    attachAllCardDrag(triggerSave);
+    updateAllCardElements();
+
+    const w2 = window as unknown as Record<string, unknown>;
+    w2.resetLayout = resetLayout;
   }
 
   // Editor state (module-level for vanilla JS functions)
@@ -415,16 +423,10 @@ export default function Editor() {
           {/* DESIGN TAB */}
           <div className="tab-panel" id="panel-design">
 
-            <div className="accordion">
-              <div className="accordion-header" onClick={(e) => toggleAccordion(e.currentTarget)}>
-                <span className="acc-title">Rekkefølge på innhold</span><span className="chevron">▼</span>
-              </div>
-              <div className="accordion-body">
-                <div style={{padding:'6px 14px 4px',fontSize:'10px',color:'var(--text-muted)'}}>
-                  Dra og slipp for å endre rekkefølge på kortet.
-                </div>
-                <div id="module-order-list"></div>
-              </div>
+            <div style={{padding:'8px 14px'}}>
+              <button className="btn btn-secondary btn-full" style={{fontSize:'11px'}} onClick={() => { resetLayout(); triggerSave(); }}>
+                ↺ Tilbakestill standard layout
+              </button>
             </div>
 
             <div className="sep"></div>
@@ -520,6 +522,7 @@ export default function Editor() {
         </div>
 
         <div id="save-section">
+          <div id="pos-readout" style={{fontSize:'10px',color:'var(--accent)',minHeight:'14px',letterSpacing:'0.5px',marginBottom:'4px'}}></div>
           <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'4px',letterSpacing:'0.5px'}}>
             {currentProjectId !== 'default' ? `Prosjekt: ${currentProjectId}` : 'Prosjekt: (standard)'}
           </div>
@@ -551,12 +554,22 @@ export default function Editor() {
           <div id="invite-card">
             <div id="bg-img-layer"></div>
             <div id="bg-color-layer"></div>
-            <img id="portrait-img" alt="portrett" />
-            <div id="portrait-placeholder">+ Klikk for å laste opp portrettfoto</div>
-            <div id="portrait-fade"></div>
-            <svg id="grass-layer" viewBox="0 0 559 50" preserveAspectRatio="none"></svg>
-            <div id="content-layer"></div>
-            <img id="cutout-img" alt="cutout" />
+            <img id="el-portrait" className="card-el" data-el="portrait" alt="portrett" style={{display:'none',width:'100%',height:'302px',objectFit:'cover'}} />
+            <div id="el-portrait-placeholder" style={{position:'absolute',top:0,left:0,width:'100%',height:'302px',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:'13px',cursor:'pointer',background:'rgba(200,200,200,0.08)',border:'2px dashed var(--border)',zIndex:3}} onClick={() => (document.getElementById('main-upload') as HTMLInputElement)?.click()}>+ Klikk for å laste opp portrettfoto</div>
+            <div id="el-portrait-fade" style={{position:'absolute',pointerEvents:'none',width:'100%',height:'120px',zIndex:4}}></div>
+            <svg id="el-grass" className="card-el" data-el="grass" viewBox="0 0 559 50" preserveAspectRatio="none" style={{width:'559px',height:'50px'}}></svg>
+            <div id="el-topline" className="card-el" data-el="topline" style={{textAlign:'center',width:'519px'}}></div>
+            <div id="el-divider1" className="card-el" data-el="divider1" style={{width:'479px',height:'1px',background:'#c8a068'}}></div>
+            <div id="el-intro" className="card-el" data-el="intro" style={{textAlign:'center',width:'519px'}}></div>
+            <div id="el-name" className="card-el" data-el="name" style={{textAlign:'center',width:'519px'}}></div>
+            <div id="el-subtitle" className="card-el" data-el="subtitle" style={{textAlign:'center',width:'519px'}}></div>
+            <div id="el-datebadge" className="card-el" data-el="datebadge" style={{display:'inline-block'}}></div>
+            <div id="el-divider2" className="card-el" data-el="divider2" style={{width:'479px',height:'1px',background:'#c8a068'}}></div>
+            <div id="el-program" className="card-el" data-el="program" style={{textAlign:'center',width:'479px'}}></div>
+            <div id="el-divider3" className="card-el" data-el="divider3" style={{width:'479px',height:'1px',background:'#c8a068'}}></div>
+            <div id="el-greeting" className="card-el" data-el="greeting" style={{textAlign:'center',width:'519px'}}></div>
+            <div id="el-rsvp" className="card-el" data-el="rsvp" style={{width:'479px'}}></div>
+            <img id="cutout-img" className="card-el" data-el="cutout" alt="cutout" style={{display:'none',width:'220px'}} />
             <div id="card-border-overlay"></div>
             <div id="ornament"></div>
           </div>
@@ -723,7 +736,26 @@ const editorState = {
   rsvpTransparent: false,
   fields: Object.fromEntries(FIELD_KEYS.map(k => [k, { bold: false, italic: k === 'intro' || k === 'subtitle' }])),
   moduleOrder: [...DEFAULT_MODULE_ORDER],
+  selectedElement: null as string | null,
+  positions: {
+    portrait:  { x: 0,   y: 0,   z: 3  },
+    grass:     { x: 0,   y: 282, z: 5  },
+    topline:   { x: 0,   y: 312, z: 6  },
+    divider1:  { x: 40,  y: 336, z: 6  },
+    intro:     { x: 0,   y: 350, z: 6  },
+    name:      { x: 0,   y: 370, z: 6  },
+    subtitle:  { x: 0,   y: 415, z: 6  },
+    datebadge: { x: 80,  y: 440, z: 6  },
+    divider2:  { x: 40,  y: 475, z: 6  },
+    program:   { x: 20,  y: 490, z: 6  },
+    divider3:  { x: 40,  y: 560, z: 6  },
+    greeting:  { x: 0,   y: 574, z: 6  },
+    rsvp:      { x: 40,  y: 604, z: 6  },
+    cutout:    { x: 330, y: 480, z: 10 },
+  } as Record<string, { x: number; y: number; z: number }>,
 };
+
+let currentCardScale = 1;
 
 function g(id: string): HTMLInputElement {
   return document.getElementById(id) as HTMLInputElement;
@@ -744,7 +776,8 @@ function scaleCard() {
   const aW = area.clientWidth - 40;
   const aH = area.clientHeight - 40;
   const scale = Math.min(aW / 559, aH / 794, 1);
-  wrapper.style.transform = `scale(${scale})`;
+  currentCardScale = scale;
+  wrapper.style.transform = `scale(${currentCardScale})`;
   wrapper.style.marginTop = `-${(794 * (1 - scale)) / 2}px`;
 }
 
@@ -774,94 +807,84 @@ function toggleAccordion(header: Element) {
   }
 }
 
-let _buildContentTimer: ReturnType<typeof setTimeout> | null = null;
-function buildContent() {
-  if (_buildContentTimer) return; // already scheduled
-  _buildContentTimer = setTimeout(() => {
-    _buildContentTimer = null;
-    _buildContentNow();
-  }, 16); // one frame debounce
-}
-function renderModule(key: string, f: Record<string, {
-  text: string; font: string; size: number; color: string;
-  bold: boolean; italic: boolean; spacing: number; lh: number;
-}>, divColor: string, divW: string, badgeBg: string, badgeRadius: string): string {
-  const fw = (k: string) => f[k]?.bold ? '700' : '400';
-  const fi = (k: string) => f[k]?.italic ? 'italic' : 'normal';
+function updateCardElement(key: string) {
+  const elId = (key === 'date') ? 'datebadge' : key;
+  const el = document.getElementById('el-' + elId);
+  if (!el) return;
 
-  switch (key) {
-    case 'topline':
-      return `<div class="card-topline" style="font-family:'${f.topline.font}',sans-serif;font-size:${f.topline.size}px;color:${f.topline.color};font-weight:${fw('topline')};font-style:${fi('topline')};letter-spacing:${f.topline.spacing}px;text-transform:uppercase;padding:0 20px;">${f.topline.text}</div>`;
-    case 'divider1':
-    case 'divider2':
-    case 'divider3':
-      return `<hr class="card-divider" style="border-top:${divW}px solid ${divColor};margin:${key === 'divider1' ? '10px' : '6px'} auto;">`;
-    case 'intro':
-      return `<div class="card-intro" style="font-family:'${f.intro.font}',serif;font-size:${f.intro.size}px;color:${f.intro.color};font-weight:${fw('intro')};font-style:${fi('intro')};letter-spacing:${f.intro.spacing}px;margin-bottom:4px;">${f.intro.text}</div>`;
-    case 'name':
-      return `<div class="card-name" style="font-family:'${f.name.font}',serif;font-size:${f.name.size}px;color:${f.name.color};font-weight:${fw('name')};font-style:${fi('name')};letter-spacing:${f.name.spacing}px;line-height:1.1;margin-bottom:6px;padding:0 16px;">${f.name.text}</div>`;
-    case 'subtitle':
-      return `<div class="card-subtitle" style="font-family:'${f.subtitle.font}',serif;font-size:${f.subtitle.size}px;color:${f.subtitle.color};font-weight:${fw('subtitle')};font-style:${fi('subtitle')};letter-spacing:${f.subtitle.spacing}px;margin-bottom:10px;">${f.subtitle.text}</div>`;
-    case 'datebadge':
-      return `<div class="card-date-badge" style="background:${badgeBg};border-radius:${badgeRadius}px;padding:6px 22px;margin-bottom:10px;"><span style="font-family:'${f.date.font}',sans-serif;font-size:${f.date.size}px;color:${f.date.color};font-weight:${fw('date')};font-style:${fi('date')};letter-spacing:${f.date.spacing}px;">${f.date.text}</span></div>`;
-    case 'program':
-      return `<div class="card-program" style="font-family:'${f.program.font}',serif;font-size:${f.program.size}px;color:${f.program.color};font-weight:${fw('program')};font-style:${fi('program')};line-height:${f.program.lh};margin:8px 0;">${f.program.text.replace(/\n/g, '<br>')}</div>`;
-    case 'greeting':
-      return `<div class="card-greeting" style="font-family:'${f.greeting.font}',serif;font-size:${f.greeting.size}px;color:${f.greeting.color};font-weight:${fw('greeting')};font-style:${fi('greeting')};letter-spacing:${f.greeting.spacing}px;margin:6px 0;">${f.greeting.text}</div>`;
-    case 'rsvp': {
-      const rsvpVisible = (g('rsvp-visible') as HTMLInputElement)?.checked !== false;
-      if (!rsvpVisible) return '';
+  const font = g('fn-' + key)?.value || 'Lato';
+  const size = g('fs-' + key)?.value || '14';
+  const color = g('fc-' + key)?.value || '#333';
+  const bold = editorState.fields[key]?.bold ?? false;
+  const italic = editorState.fields[key]?.italic ?? false;
+  const spacing = g('fls-' + key)?.value || '0';
+  const lhRaw = parseInt(g('flh-' + key)?.value || '16');
+  const lh = (lhRaw / 10).toFixed(1);
+  const text = getFieldText(key);
+  const fw = bold ? '700' : '400';
+  const fi = italic ? 'italic' : 'normal';
+
+  if (key === 'date') {
+    const badgeBg = g('badge-bg')?.value || '#888';
+    const badgeRadius = g('badge-radius')?.value || '20';
+    el.style.background = badgeBg;
+    el.style.borderRadius = badgeRadius + 'px';
+    el.style.padding = '6px 22px';
+    el.style.display = 'inline-block';
+    el.innerHTML = `<span style="font-family:'${font}',sans-serif;font-size:${size}px;color:${color};font-weight:${fw};font-style:${fi};letter-spacing:${spacing}px;white-space:nowrap;">${text}</span>`;
+  } else if (key === 'rsvp') {
+    const rsvpVisible = (g('rsvp-visible') as HTMLInputElement)?.checked !== false;
+    el.style.display = rsvpVisible ? 'block' : 'none';
+    if (rsvpVisible) {
       const rsvpBg = editorState.rsvpTransparent ? 'transparent' : (g('rsvp-bg')?.value || '#f0e8d8');
       const rsvpBorderColor = g('rsvp-border-color')?.value || '#c8a068';
       const rsvpBorderW = g('rsvp-border-w')?.value || '1';
       const rsvpBorderStyle = g('rsvp-border-style')?.value || 'solid';
       const rsvpRadius = g('rsvp-radius')?.value || '8';
       const rsvpPadding = g('rsvp-padding')?.value || '12';
-      return `<div id="rsvp-box" style="background:${rsvpBg};border:${rsvpBorderW}px ${rsvpBorderStyle} ${rsvpBorderColor};border-radius:${rsvpRadius}px;padding:${rsvpPadding}px;margin:8px 40px 8px;text-align:center;width:calc(100% - 80px);"><div style="font-family:'${f.rsvp.font}',sans-serif;font-size:${f.rsvp.size}px;color:${f.rsvp.color};font-weight:${fw('rsvp')};font-style:${fi('rsvp')};line-height:${f.rsvp.lh};">${f.rsvp.text.replace(/\n/g, '<br>')}</div></div>`;
+      el.style.background = rsvpBg;
+      el.style.border = `${rsvpBorderW}px ${rsvpBorderStyle} ${rsvpBorderColor}`;
+      el.style.borderRadius = rsvpRadius + 'px';
+      el.style.padding = rsvpPadding + 'px';
+      el.innerHTML = `<div style="font-family:'${font}',sans-serif;font-size:${size}px;color:${color};font-weight:${fw};font-style:${fi};line-height:${lh};">${text.replace(/\n/g, '<br>')}</div>`;
     }
-    default:
-      return '';
+  } else if (key === 'program') {
+    el.style.fontFamily = `'${font}',serif`;
+    el.style.fontSize = size + 'px';
+    el.style.color = color;
+    el.style.fontWeight = fw;
+    el.style.fontStyle = fi;
+    el.style.lineHeight = lh;
+    el.innerHTML = text.replace(/\n/g, '<br>');
+  } else {
+    el.style.fontFamily = `'${font}',${key === 'topline' ? 'sans-serif' : 'serif'}`;
+    el.style.fontSize = size + 'px';
+    el.style.color = color;
+    el.style.fontWeight = fw;
+    el.style.fontStyle = fi;
+    el.style.letterSpacing = spacing + 'px';
+    if (key === 'topline') el.style.textTransform = 'uppercase';
+    if (key === 'name') el.style.lineHeight = '1.1';
+    el.textContent = text;
   }
 }
 
-function _buildContentNow() {
-  const cl = document.getElementById('content-layer');
-  if (!cl) return;
-  const mainH = parseInt(g('main-height')?.value || '302');
-  cl.style.top = (mainH - 10) + 'px';
-
-  const f: Record<string, {
-    text: string; font: string; size: number; color: string;
-    bold: boolean; italic: boolean; spacing: number; lh: number;
-  }> = {};
-
-  FIELD_KEYS.forEach(k => {
-    f[k] = {
-      text: getFieldText(k),
-      font: g('fn-' + k)?.value || 'Lato',
-      size: parseInt(g('fs-' + k)?.value || '14'),
-      color: g('fc-' + k)?.value || '#333',
-      bold: editorState.fields[k].bold,
-      italic: editorState.fields[k].italic,
-      spacing: parseFloat(g('fls-' + k)?.value || '0'),
-      lh: parseFloat(g('flh-' + k)?.value || '16') / 10,
-    };
-  });
-
+function updateDividerElements() {
   const divColor = g('divider-color')?.value || '#ccc';
-  const divW = g('divider-width')?.value || '1';
-  const badgeBg = g('badge-bg')?.value || '#888';
-  const badgeRadius = g('badge-radius')?.value || '20';
-
-  let html = `<div style="width:100%;display:flex;flex-direction:column;align-items:center;padding:0 0 16px;">`;
-  html += `<div style="height:16px;"></div>`;
-
-  editorState.moduleOrder.forEach(key => {
-    html += renderModule(key, f, divColor, divW, badgeBg, badgeRadius);
+  const divW = parseFloat(g('divider-width')?.value || '1');
+  ['divider1','divider2','divider3'].forEach(id => {
+    const el = document.getElementById('el-' + id);
+    if (el) { el.style.height = divW + 'px'; el.style.background = divColor; }
   });
+}
 
-  html += `</div>`;
-  cl.innerHTML = html;
+function updateAllCardElements() {
+  FIELD_KEYS.forEach(k => updateCardElement(k));
+  updateDividerElements();
+}
+
+function _buildContentNow() {
+  updateAllCardElements();
 }
 
 function getFieldText(key: string): string {
@@ -884,21 +907,21 @@ function syncField(key: string) {
   const lhV = document.getElementById('flh-' + key + '-v');
   if (lhEl && lhV) lhV.textContent = (parseInt(lhEl.value) / 10).toFixed(1);
 
-  buildContent();
+  updateCardElement(key);
 }
 
 function toggleBold(key: string) {
   editorState.fields[key].bold = !editorState.fields[key].bold;
   const btn = document.getElementById('fb-' + key);
   if (btn) btn.classList.toggle('active', editorState.fields[key].bold);
-  buildContent();
+  updateCardElement(key);
 }
 
 function toggleItalic(key: string) {
   editorState.fields[key].italic = !editorState.fields[key].italic;
   const btn = document.getElementById('fi-' + key);
   if (btn) btn.classList.toggle('active', editorState.fields[key].italic);
-  buildContent();
+  updateCardElement(key);
 }
 
 // Image helpers
@@ -932,8 +955,8 @@ async function loadMainImage(event: Event) {
   let dataURL = await fileToDataURL(file);
   dataURL = await compressImage(dataURL, 1200, 900, 0.85);
   editorState.mainImage = dataURL;
-  const img = document.getElementById('portrait-img') as HTMLImageElement;
-  const placeholder = document.getElementById('portrait-placeholder');
+  const img = document.getElementById('el-portrait') as HTMLImageElement;
+  const placeholder = document.getElementById('el-portrait-placeholder');
   img.src = dataURL; img.style.display = 'block';
   if (placeholder) placeholder.style.display = 'none';
   const thumb = document.getElementById('main-thumb') as HTMLImageElement;
@@ -943,9 +966,9 @@ async function loadMainImage(event: Event) {
 
 function removeMainImage() {
   editorState.mainImage = null;
-  const img = document.getElementById('portrait-img') as HTMLImageElement;
+  const img = document.getElementById('el-portrait') as HTMLImageElement;
   img.src = ''; img.style.display = 'none';
-  const placeholder = document.getElementById('portrait-placeholder');
+  const placeholder = document.getElementById('el-portrait-placeholder');
   if (placeholder) placeholder.style.display = 'flex';
   const thumb = document.getElementById('main-thumb');
   if (thumb) thumb.classList.add('empty');
@@ -957,24 +980,23 @@ function updateMainHeight() {
   const h = parseInt(g('main-height')?.value || '302');
   const hv = document.getElementById('main-height-v');
   if (hv) hv.textContent = h + 'px';
-  const img = document.getElementById('portrait-img') as HTMLImageElement;
-  const placeholder = document.getElementById('portrait-placeholder');
+  const img = document.getElementById('el-portrait') as HTMLImageElement;
+  const placeholder = document.getElementById('el-portrait-placeholder');
   if (img) img.style.height = h + 'px';
   if (placeholder) (placeholder as HTMLElement).style.height = h + 'px';
-  const fade = document.getElementById('portrait-fade');
+  const fade = document.getElementById('el-portrait-fade');
   if (fade) fade.style.top = (h - 120) + 'px';
-  const grass = document.getElementById('grass-layer');
-  if (grass) grass.style.top = (h - 20) + 'px';
+  editorState.positions.grass.y = h - 20;
+  applyPosition('grass');
   updateMainZoom();
   updateMainPos();
-  buildContent();
 }
 
 function updateMainZoom() {
   const zoom = parseInt(g('main-zoom')?.value || '100');
   const zv = document.getElementById('main-zoom-v');
   if (zv) zv.textContent = zoom + '%';
-  const img = document.getElementById('portrait-img') as HTMLImageElement;
+  const img = document.getElementById('el-portrait') as HTMLImageElement;
   if (img) {
     img.style.objectFit = 'cover';
     img.style.transform = `scale(${zoom / 100})`;
@@ -986,7 +1008,7 @@ function updateMainPos() {
   const pos = parseInt(g('main-pos')?.value || '20');
   const pv = document.getElementById('main-pos-v');
   if (pv) pv.textContent = pos + '%';
-  const img = document.getElementById('portrait-img') as HTMLImageElement;
+  const img = document.getElementById('el-portrait') as HTMLImageElement;
   if (img) img.style.objectPosition = `center ${pos}%`;
 }
 
@@ -1259,7 +1281,7 @@ function updateCardBg() {
 function updateFade() {
   const color = g('fade-color')?.value || '#fdf6ec';
   const style = g('fade-style')?.value || 'soft';
-  const fade = document.getElementById('portrait-fade');
+  const fade = document.getElementById('el-portrait-fade');
   if (!fade) return;
   if (style === 'none') fade.style.background = 'none';
   else if (style === 'hard') fade.style.background = `linear-gradient(to bottom, transparent 0%, ${color} 60%)`;
@@ -1269,13 +1291,13 @@ function updateFade() {
 function updateBadge() {
   const radius = g('badge-radius')?.value || '20';
   const rv = document.getElementById('badge-radius-v'); if (rv) rv.textContent = radius + 'px';
-  buildContent();
+  updateCardElement('date');
 }
 
 function updateDividers() {
   const dv = document.getElementById('divider-width-v');
   if (dv) dv.textContent = (g('divider-width')?.value || '1') + 'px';
-  buildContent();
+  updateDividerElements();
 }
 
 function updateCardBorder() {
@@ -1311,9 +1333,8 @@ function updateCardBorder() {
 }
 
 function generateGrass(baseColor: string) {
-  const svg = document.getElementById('grass-layer');
+  const svg = document.getElementById('el-grass');
   if (!svg) return;
-  svg.style.top = (parseInt(g('main-height')?.value || '302') - 20) + 'px';
   const r = parseInt(baseColor.slice(1, 3), 16);
   const gr = parseInt(baseColor.slice(3, 5), 16);
   const b = parseInt(baseColor.slice(5, 7), 16);
@@ -1342,7 +1363,7 @@ function generateGrass(baseColor: string) {
 function updateGrass() {
   const visible = (g('grass-visible') as HTMLInputElement)?.checked;
   const color = g('grass-color')?.value || '#2d8a1b';
-  const layer = document.getElementById('grass-layer');
+  const layer = document.getElementById('el-grass');
   if (layer) layer.style.display = visible ? 'block' : 'none';
   if (visible) generateGrass(color);
 }
@@ -1370,17 +1391,17 @@ function updateRsvpBox() {
   const bwv = document.getElementById('rsvp-border-w-v'); if (bwv) bwv.textContent = (g('rsvp-border-w')?.value || '1') + 'px';
   const rv = document.getElementById('rsvp-radius-v'); if (rv) rv.textContent = (g('rsvp-radius')?.value || '8') + 'px';
   const pv = document.getElementById('rsvp-padding-v'); if (pv) pv.textContent = (g('rsvp-padding')?.value || '12') + 'px';
-  buildContent();
+  updateCardElement('rsvp');
 }
 
 function toggleRsvpTransparent() {
   editorState.rsvpTransparent = !editorState.rsvpTransparent;
   const btn = document.getElementById('rsvp-transparent-btn');
   if (btn) btn.classList.toggle('active', editorState.rsvpTransparent);
-  buildContent();
+  updateCardElement('rsvp');
 }
 
-function toggleRsvpBox() { buildContent(); }
+function toggleRsvpBox() { updateCardElement('rsvp'); }
 
 function applyTemplate(name: string) {
   const t = TEMPLATES[name];
@@ -1435,7 +1456,7 @@ function applyTemplate(name: string) {
 
   updateFade();
   updateCardBorder();
-  buildContent();
+  updateAllCardElements();
 }
 
 // ============================================================
@@ -1496,10 +1517,118 @@ function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
       editorState.moduleOrder = newOrder;
 
       renderModuleOrderUI(triggerSave);
-      buildContent();
+      updateAllCardElements();
       if (triggerSave) triggerSave();
     });
   });
+}
+
+// ============================================================
+// FREE-POSITION DRAG SYSTEM
+// ============================================================
+function applyPosition(id: string) {
+  const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
+  if (!el) return;
+  const pos = editorState.positions[id];
+  if (!pos) return;
+  (el as HTMLElement).style.left = pos.x + 'px';
+  (el as HTMLElement).style.top = pos.y + 'px';
+  (el as HTMLElement).style.zIndex = String(pos.z);
+}
+
+function applyAllPositions() {
+  Object.keys(editorState.positions).forEach(id => applyPosition(id));
+}
+
+function selectCardElement(id: string) {
+  editorState.selectedElement = id;
+  document.querySelectorAll('.card-el').forEach(e => e.classList.remove('selected'));
+  const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
+  if (el) el.classList.add('selected');
+  const FIELD_KEYS_LOCAL = ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp'];
+  const dateFields = ['datebadge'];
+  if (FIELD_KEYS_LOCAL.includes(id) || dateFields.includes(id)) {
+    switchTab('tekst');
+    const fieldKey = id === 'datebadge' ? 'date' : id;
+    const inputEl = document.getElementById('in-' + fieldKey);
+    const acc = inputEl?.closest('.accordion');
+    if (acc) {
+      const header = acc.querySelector('.accordion-header') as HTMLElement;
+      if (header && !header.classList.contains('open')) toggleAccordion(header);
+    }
+  } else if (id === 'portrait' || id === 'cutout') {
+    switchTab('bilder');
+  } else if (id === 'grass' || id.startsWith('divider')) {
+    switchTab('design');
+  }
+  const readout = document.getElementById('pos-readout');
+  if (readout) {
+    const pos = editorState.positions[id];
+    readout.textContent = pos ? `${MODULE_LABELS[id] || id}: X ${Math.round(pos.x)} · Y ${Math.round(pos.y)}` : '';
+  }
+}
+
+function attachCardDrag(id: string, triggerSave: () => void) {
+  const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
+  if (!el) return;
+  const htmlEl = el as HTMLElement;
+  let startClientX = 0, startClientY = 0, origX = 0, origY = 0, dragging = false;
+
+  htmlEl.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    htmlEl.setPointerCapture(e.pointerId);
+    selectCardElement(id);
+    if (!editorState.positions[id]) editorState.positions[id] = { x: 0, y: 0, z: 6 };
+    origX = editorState.positions[id].x;
+    origY = editorState.positions[id].y;
+    startClientX = e.clientX;
+    startClientY = e.clientY;
+    dragging = true;
+  });
+
+  htmlEl.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!dragging || !htmlEl.hasPointerCapture(e.pointerId)) return;
+    const dx = (e.clientX - startClientX) / currentCardScale;
+    const dy = (e.clientY - startClientY) / currentCardScale;
+    editorState.positions[id].x = Math.round(origX + dx);
+    editorState.positions[id].y = Math.round(origY + dy);
+    applyPosition(id);
+    const readout = document.getElementById('pos-readout');
+    if (readout) readout.textContent = `${MODULE_LABELS[id] || id}: X ${Math.round(editorState.positions[id].x)} · Y ${Math.round(editorState.positions[id].y)}`;
+  });
+
+  htmlEl.addEventListener('pointerup', (e: PointerEvent) => {
+    if (!dragging) return;
+    dragging = false;
+    htmlEl.releasePointerCapture(e.pointerId);
+    triggerSave();
+  });
+}
+
+function attachAllCardDrag(triggerSave: () => void) {
+  ['portrait','grass','topline','divider1','intro','name','subtitle','datebadge','divider2','program','divider3','greeting','rsvp','cutout'].forEach(id => attachCardDrag(id, triggerSave));
+}
+
+function resetLayout() {
+  editorState.positions = {
+    portrait:  { x: 0,   y: 0,   z: 3  },
+    grass:     { x: 0,   y: 282, z: 5  },
+    topline:   { x: 0,   y: 312, z: 6  },
+    divider1:  { x: 40,  y: 336, z: 6  },
+    intro:     { x: 0,   y: 350, z: 6  },
+    name:      { x: 0,   y: 370, z: 6  },
+    subtitle:  { x: 0,   y: 415, z: 6  },
+    datebadge: { x: 80,  y: 440, z: 6  },
+    divider2:  { x: 40,  y: 475, z: 6  },
+    program:   { x: 20,  y: 490, z: 6  },
+    divider3:  { x: 40,  y: 560, z: 6  },
+    greeting:  { x: 0,   y: 574, z: 6  },
+    rsvp:      { x: 40,  y: 604, z: 6  },
+    cutout:    { x: 330, y: 480, z: 10 },
+  };
+  applyAllPositions();
 }
 
 // ============================================================
@@ -1572,6 +1701,7 @@ function collectState() {
     },
     removebgKey: g('removebg-key')?.value,
     moduleOrder: [...editorState.moduleOrder],
+    positions: JSON.parse(JSON.stringify(editorState.positions)),
   };
 }
 
@@ -1621,9 +1751,9 @@ function applyProjectData(data: Record<string, unknown>) {
     if (mi) {
       if (mi.src) {
         editorState.mainImage = mi.src as string;
-        const img = document.getElementById('portrait-img') as HTMLImageElement;
+        const img = document.getElementById('el-portrait') as HTMLImageElement;
         img.src = mi.src as string; img.style.display = 'block';
-        const ph = document.getElementById('portrait-placeholder');
+        const ph = document.getElementById('el-portrait-placeholder');
         if (ph) ph.style.display = 'none';
         const thumb = document.getElementById('main-thumb') as HTMLImageElement;
         thumb.src = mi.src as string; thumb.classList.remove('empty');
@@ -1704,7 +1834,17 @@ function applyProjectData(data: Record<string, unknown>) {
     renderModuleOrderUI();
   }
 
-  buildContent();
+  if (data.positions && typeof data.positions === 'object') {
+    const savedPos = data.positions as Record<string, {x:number;y:number;z:number}>;
+    Object.keys(savedPos).forEach(id => {
+      if (editorState.positions[id]) {
+        editorState.positions[id] = { ...editorState.positions[id], ...savedPos[id] };
+      }
+    });
+    applyAllPositions();
+  }
+
+  updateAllCardElements();
 }
 
 // Local save/load (fallback)
@@ -1732,6 +1872,7 @@ function loadProject() {
 
 // Export
 async function downloadPNG() {
+  document.querySelectorAll('.card-el.selected').forEach(e => e.classList.remove('selected'));
   showToast('Genererer PNG...');
   try {
     const card = document.getElementById('invite-card') as HTMLElement;
@@ -1747,6 +1888,7 @@ async function downloadPNG() {
 }
 
 async function downloadPDF() {
+  document.querySelectorAll('.card-el.selected').forEach(e => e.classList.remove('selected'));
   showToast('Genererer PDF...');
   try {
     const card = document.getElementById('invite-card') as HTMLElement;
