@@ -656,7 +656,15 @@ function toggleAccordion(header: Element) {
   }
 }
 
+let _buildContentTimer: ReturnType<typeof setTimeout> | null = null;
 function buildContent() {
+  if (_buildContentTimer) return; // already scheduled
+  _buildContentTimer = setTimeout(() => {
+    _buildContentTimer = null;
+    _buildContentNow();
+  }, 16); // one frame debounce
+}
+function _buildContentNow() {
   const cl = document.getElementById('content-layer');
   if (!cl) return;
   const mainH = parseInt(g('main-height')?.value || '302');
