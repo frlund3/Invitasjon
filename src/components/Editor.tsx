@@ -283,6 +283,7 @@ export default function Editor() {
     w.undo = undo;
     w.redo = redo;
     w.pushUndo = pushUndo;
+    w.applyInvitationType = applyInvitationType;
 
     // Keyboard shortcuts for undo/redo
     document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -327,15 +328,25 @@ export default function Editor() {
 
         <SaveStatusBar status={status} projectId={currentProjectId} />
 
+        <div id="type-section">
+          <h2>Type</h2>
+          <div className="type-btns">
+            <button className="type-btn active" id="type-konfirmasjon" onClick={() => { applyInvitationType('konfirmasjon'); triggerSave(); }}>✝️<span>Konfirmasjon</span></button>
+            <button className="type-btn" id="type-bursdag" onClick={() => { applyInvitationType('bursdag'); triggerSave(); }}>🎂<span>Bursdag</span></button>
+            <button className="type-btn" id="type-bryllup" onClick={() => { applyInvitationType('bryllup'); triggerSave(); }}>💍<span>Bryllup</span></button>
+            <button className="type-btn" id="type-barnedag" onClick={() => { applyInvitationType('barnedag'); triggerSave(); }}>🕊️<span>Barnedåp</span></button>
+          </div>
+        </div>
+
         <div id="template-section">
           <h2>Mal</h2>
           <div className="template-cards">
-            <div className="tpl-card active" id="tpl-natur" onClick={() => { applyTemplate('natur'); triggerSave(); }}>NATUR<span>Varm/Jord</span></div>
-            <div className="tpl-card" id="tpl-klassisk" onClick={() => { applyTemplate('klassisk'); triggerSave(); }}>KLASSISK<span>Lys/Navy</span></div>
-            <div className="tpl-card" id="tpl-minimal" onClick={() => { applyTemplate('minimal'); triggerSave(); }}>MINIMAL<span>Ren/Sort</span></div>
-            <div className="tpl-card" id="tpl-romantisk" onClick={() => { applyTemplate('romantisk'); triggerSave(); }}>ROMANTISK<span>Rosa/Guld</span></div>
-            <div className="tpl-card" id="tpl-hav" onClick={() => { applyTemplate('hav'); triggerSave(); }}>HAV<span>Blå/Frisk</span></div>
-            <div className="tpl-card" id="tpl-midnatt" onClick={() => { applyTemplate('midnatt'); triggerSave(); }}>MIDNATT<span>Mørk/Lilla</span></div>
+            <div className="tpl-card active" id="tpl-natur" onClick={() => { applyTemplate('natur'); triggerSave(); }}>SKOG<span>Varm/Jord</span></div>
+            <div className="tpl-card" id="tpl-klassisk" onClick={() => { applyTemplate('klassisk'); triggerSave(); }}>NAVY<span>Elegant/Blå</span></div>
+            <div className="tpl-card" id="tpl-minimal" onClick={() => { applyTemplate('minimal'); triggerSave(); }}>CLEAN<span>Ren/Sort</span></div>
+            <div className="tpl-card" id="tpl-romantisk" onClick={() => { applyTemplate('romantisk'); triggerSave(); }}>ROSE<span>Rosa/Guld</span></div>
+            <div className="tpl-card" id="tpl-hav" onClick={() => { applyTemplate('hav'); triggerSave(); }}>HAVN<span>Blå/Frisk</span></div>
+            <div className="tpl-card" id="tpl-midnatt" onClick={() => { applyTemplate('midnatt'); triggerSave(); }}>NATT<span>Mørk/Lilla</span></div>
           </div>
         </div>
 
@@ -759,6 +770,45 @@ const FIELD_DEFAULTS: Record<string, string> = {
   greeting: 'Vi ses — og gleder oss!',
   rsvp: 'Svar innen 1. mai til\nmagnus@familie.no\nTlf: 900 00 000',
 };
+
+const INVITATION_TYPES: Record<string, { label: string; icon: string; topline: string; intro: string; subtitle: string; program: string; greeting: string; rsvp: string }> = {
+  konfirmasjon: {
+    label: 'Konfirmasjon', icon: '✝️',
+    topline: 'DU ER HERVED INVITERT TIL',
+    intro: 'konfirmasjonen til',
+    subtitle: 'Konfirmant 2026',
+    program: '12:00 — Gudstjeneste i Gamle Aker Kirke\n14:00 — Middag på Holmenkollen Park Hotell\n19:00 — Fest og moro for alle!',
+    greeting: 'Vi ses — og gleder oss!',
+    rsvp: 'Svar innen 1. mai til\nmagnus@familie.no\nTlf: 900 00 000',
+  },
+  bursdag: {
+    label: 'Bursdag', icon: '🎂',
+    topline: 'DU ER INVITERT TIL BURSDAGSFEST!',
+    intro: 'Vi feirer',
+    subtitle: '18 år — bli med å feire!',
+    program: '15:00 — Dørene åpner\n16:00 — Middag og moro\n19:00 — Kake og fest!',
+    greeting: 'Gleder oss til å se deg!',
+    rsvp: 'Svar innen 1. mai til\nnavn@familie.no\nTlf: 900 00 000',
+  },
+  bryllup: {
+    label: 'Bryllup', icon: '💍',
+    topline: 'VI ER SÅ GLADE FOR Å INVITERE DEG',
+    intro: 'til bryllupet mellom',
+    subtitle: 'Evig forenet — 14. juni 2026',
+    program: '13:00 — Vielse i Gamle Aker Kirke\n15:00 — Cocktailtime og bilder\n18:00 — Middag og fest',
+    greeting: 'Vi gleder oss til å dele denne dagen med deg!',
+    rsvp: 'Svar innen 1. mai til\nbryllup@familie.no\nTlf: 900 00 000',
+  },
+  barnedag: {
+    label: 'Barnedåp', icon: '🕊️',
+    topline: 'VELKOMMEN TIL DÅPSFEST',
+    intro: 'Vi feirer dåpen til',
+    subtitle: 'Bli med å feire det nye livet',
+    program: '11:00 — Dåpsgudstjeneste i kirken\n13:00 — Middag hjemme hos oss\n16:00 — Kake og kaffe',
+    greeting: 'Kom og del denne gleden med oss!',
+    rsvp: 'Svar innen 1. mai til\nnavn@familie.no\nTlf: 900 00 000',
+  },
+};
 const MULTILINE_FIELDS = ['program', 'rsvp'];
 
 function FieldAccordion({ fieldKey, onChange }: { fieldKey: string; onChange: () => void }) {
@@ -903,6 +953,7 @@ let zoomOverride: number | null = null;
 
 const editorState = {
   template: 'natur',
+  invitationType: 'konfirmasjon',
   mainImage: null as string | null,
   cutoutImage: null as string | null,
   cutoutOriginalSrc: null as string | null,
@@ -993,7 +1044,8 @@ function updateCardElement(key: string) {
   const el = document.getElementById('el-' + elId);
   if (!el) return;
 
-  if (editorState.hiddenModules.includes(elId) || editorState.hiddenModules.includes(key)) {
+  const isRemoved = !editorState.moduleOrder.includes(elId) && !editorState.moduleOrder.includes(key);
+  if (isRemoved || editorState.hiddenModules.includes(elId) || editorState.hiddenModules.includes(key)) {
     el.style.display = 'none';
     return;
   }
@@ -1069,7 +1121,7 @@ function updateDividerElements() {
   ['divider1','divider2','divider3'].forEach(id => {
     const el = document.getElementById('el-' + id);
     if (el) {
-      if (editorState.hiddenModules.includes(id)) {
+      if (!editorState.moduleOrder.includes(id) || editorState.hiddenModules.includes(id)) {
         el.style.display = 'none';
       } else {
         el.style.height = divW + 'px';
@@ -1747,6 +1799,39 @@ function applyTemplate(name: string) {
   updateAllCardElements();
 }
 
+function applyInvitationType(typeKey: string) {
+  const t = INVITATION_TYPES[typeKey];
+  if (!t) return;
+  editorState.invitationType = typeKey;
+
+  // Update active button state
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('type-' + typeKey)?.classList.add('active');
+
+  // Set text fields
+  const fields: Record<string, string> = {
+    topline: t.topline,
+    intro: t.intro,
+    subtitle: t.subtitle,
+    program: t.program,
+    greeting: t.greeting,
+    rsvp: t.rsvp,
+  };
+  Object.entries(fields).forEach(([k, text]) => {
+    const el = g('in-' + k) as unknown as HTMLTextAreaElement;
+    if (el) el.value = text;
+    const cardEl = document.getElementById('el-' + k);
+    if (cardEl) {
+      if (k === 'program' || k === 'rsvp') {
+        cardEl.innerHTML = text.split('\n').map(l => `<span style="display:block">${l}</span>`).join('');
+      } else {
+        cardEl.textContent = text;
+      }
+      syncField(k);
+    }
+  });
+}
+
 // ============================================================
 // MODULE ORDER DRAG-AND-DROP
 // ============================================================
@@ -1762,10 +1847,46 @@ function renderModuleOrderUI(triggerSave?: () => void) {
     item.setAttribute('data-index', String(index));
     const isHidden = editorState.hiddenModules.includes(key);
     const labelText = editorState.customLabels[key] || MODULE_LABELS[key] || key;
-    item.innerHTML = `<span class="drag-handle">⠿</span><input class="module-label-input" data-key="${key}" value="${labelText.replace(/"/g, '&quot;')}" style="opacity:${isHidden ? 0.4 : 1};background:none;border:none;border-bottom:1px solid transparent;color:inherit;font:inherit;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;width:120px;cursor:text;padding:0 2px;" /><button class="module-vis-btn" data-key="${key}" title="${isHidden ? 'Vis' : 'Skjul'}" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:14px;padding:0 4px;opacity:${isHidden ? 0.4 : 0.8}">${isHidden ? '🚫' : '👁'}</button>`;
+    item.innerHTML = `
+      <span class="drag-handle">⠿</span>
+      <input class="module-label-input" data-key="${key}" value="${labelText.replace(/"/g, '&quot;')}" style="opacity:${isHidden ? 0.4 : 1};background:none;border:none;border-bottom:1px solid transparent;color:inherit;font:inherit;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;width:110px;cursor:text;padding:0 2px;" />
+      <button class="module-vis-btn" data-key="${key}" title="${isHidden ? 'Vis' : 'Skjul'}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 3px;opacity:${isHidden ? 0.35 : 0.7}">${isHidden ? '🚫' : '👁'}</button>
+      <button class="module-del-btn" data-key="${key}" title="Fjern lag" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 3px;opacity:0.5;color:#ff6b6b">×</button>`;
     list.appendChild(item);
   });
+
+  // Add-layer row
+  const missing = DEFAULT_MODULE_ORDER.filter(k => !editorState.moduleOrder.includes(k));
+  const addRow = document.createElement('div');
+  addRow.style.cssText = 'padding:6px 4px;';
+  const sel = document.createElement('select');
+  sel.id = 'module-add-select';
+  sel.style.cssText = 'width:100%;background:var(--surface);border:1px solid var(--border);color:inherit;font-size:11px;padding:3px 6px;border-radius:4px;';
+  if (missing.length === 0) sel.disabled = true;
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = missing.length === 0 ? '✓ Alle lag er lagt til' : '+ Legg til lag…';
+  sel.appendChild(placeholder);
+  missing.forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = MODULE_LABELS[k] || k;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => {
+    const key = sel.value;
+    if (!key) return;
+    editorState.moduleOrder.push(key);
+    renderModuleOrderUI(triggerSave);
+    updateAllCardElements();
+    updateDividerElements();
+    if (triggerSave) triggerSave();
+  });
+  addRow.appendChild(sel);
+  list.appendChild(addRow);
+
   attachDragHandlers(list, triggerSave);
+
   list.querySelectorAll('.module-label-input').forEach(inp => {
     const input = inp as HTMLInputElement;
     input.addEventListener('mousedown', e => e.stopPropagation());
@@ -1783,16 +1904,28 @@ function renderModuleOrderUI(triggerSave?: () => void) {
     });
     input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
   });
+
   list.querySelectorAll('.module-vis-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const key = (btn as HTMLElement).getAttribute('data-key')!;
       const idx = editorState.hiddenModules.indexOf(key);
-      if (idx >= 0) {
-        editorState.hiddenModules.splice(idx, 1);
-      } else {
-        editorState.hiddenModules.push(key);
-      }
+      if (idx >= 0) editorState.hiddenModules.splice(idx, 1);
+      else editorState.hiddenModules.push(key);
+      renderModuleOrderUI(triggerSave);
+      updateAllCardElements();
+      updateDividerElements();
+      if (triggerSave) triggerSave();
+    });
+  });
+
+  list.querySelectorAll('.module-del-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = (btn as HTMLElement).getAttribute('data-key')!;
+      editorState.moduleOrder = editorState.moduleOrder.filter(k => k !== key);
+      // also remove from hidden if present
+      editorState.hiddenModules = editorState.hiddenModules.filter(k => k !== key);
       renderModuleOrderUI(triggerSave);
       updateAllCardElements();
       updateDividerElements();
@@ -1990,6 +2123,7 @@ function collectState() {
   return {
     version: 2,
     template: editorState.template,
+    invitationType: editorState.invitationType,
     fields,
     images: {
       main: {
@@ -2076,6 +2210,12 @@ function applyProjectData(data: Record<string, unknown>) {
     editorState.template = data.template as string;
     document.querySelectorAll('.tpl-card').forEach(c => c.classList.remove('active'));
     document.getElementById('tpl-' + data.template)?.classList.add('active');
+  }
+
+  if (data.invitationType) {
+    editorState.invitationType = data.invitationType as string;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('type-' + data.invitationType)?.classList.add('active');
   }
 
   if (data.removebgKey) {
@@ -2531,20 +2671,20 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
 
   // Draw dividers
   for (const divKey of ['divider1', 'divider2', 'divider3']) {
-    if (!editorState.hiddenModules.includes(divKey)) {
+    if (editorState.moduleOrder.includes(divKey) && !editorState.hiddenModules.includes(divKey)) {
       drawDivider(divKey);
     }
   }
 
   // Draw text fields (all except 'date' which is handled as badge)
   for (const key of ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp']) {
-    if (!editorState.hiddenModules.includes(key)) {
+    if (editorState.moduleOrder.includes(key) && !editorState.hiddenModules.includes(key)) {
       await drawTextField(key);
     }
   }
 
   // ── 8. Date badge ─────────────────────────────────────────
-  if (!editorState.hiddenModules.includes('datebadge') && !editorState.hiddenModules.includes('date')) {
+  if (editorState.moduleOrder.includes('datebadge') && !editorState.hiddenModules.includes('datebadge') && !editorState.hiddenModules.includes('date')) {
     const badgePos = editorState.positions.datebadge || { x: 80, y: 440 };
     const badgeBg = g('badge-bg')?.value || '#8b5a2b';
     const badgeRadius = parseInt(g('badge-radius')?.value || '20');

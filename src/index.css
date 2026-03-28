@@ -45,6 +45,24 @@ body {
 #sidebar-header p { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 /* Templates */
+#type-section {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#type-section h2 { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+.type-btns { display: flex; gap: 6px; }
+.type-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 4px; border-radius: 8px; border: 2px solid var(--border);
+  background: var(--input-bg); color: var(--text-primary); cursor: pointer;
+  font-size: 18px; transition: all .15s;
+}
+.type-btn span { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); }
+.type-btn:hover { border-color: var(--accent); }
+.type-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.type-btn.active span { color: var(--accent); }
+
 #template-section {
   padding: 12px;
   border-bottom: 1px solid var(--border);
