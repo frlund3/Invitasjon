@@ -1868,13 +1868,30 @@ function loadProject() {
   }
 }
 
-// Export
-async function downloadPNG() {
+// Export helpers
+async function captureCard(): Promise<HTMLCanvasElement> {
   document.querySelectorAll('.card-el.selected').forEach(e => e.classList.remove('selected'));
+  const wrapper = document.getElementById('card-wrapper');
+  const card = document.getElementById('invite-card') as HTMLElement;
+  // Temporarily reset scale so html2canvas sees the card at 1:1
+  const prevTransform = wrapper?.style.transform || '';
+  const prevMarginTop = wrapper?.style.marginTop || '';
+  if (wrapper) { wrapper.style.transform = 'scale(1)'; wrapper.style.marginTop = '0'; }
+  await new Promise(r => setTimeout(r, 50)); // let browser repaint
+  const canvas = await html2canvas(card, {
+    scale: 2, useCORS: true, allowTaint: true,
+    backgroundColor: null, width: 559, height: 794,
+    x: 0, y: 0,
+  });
+  // Restore scale
+  if (wrapper) { wrapper.style.transform = prevTransform; wrapper.style.marginTop = prevMarginTop; }
+  return canvas;
+}
+
+async function downloadPNG() {
   showToast('Genererer PNG...');
   try {
-    const card = document.getElementById('invite-card') as HTMLElement;
-    const canvas = await html2canvas(card, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: null, width: 559, height: 794 });
+    const canvas = await captureCard();
     const link = document.createElement('a');
     link.download = 'invitasjon.png';
     link.href = canvas.toDataURL('image/png');
@@ -1886,11 +1903,9 @@ async function downloadPNG() {
 }
 
 async function downloadPDF() {
-  document.querySelectorAll('.card-el.selected').forEach(e => e.classList.remove('selected'));
   showToast('Genererer PDF...');
   try {
-    const card = document.getElementById('invite-card') as HTMLElement;
-    const canvas = await html2canvas(card, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: null, width: 559, height: 794 });
+    const canvas = await captureCard();
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
