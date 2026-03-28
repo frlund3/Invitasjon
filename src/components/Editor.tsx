@@ -554,7 +554,7 @@ export default function Editor() {
           <div id="invite-card">
             <div id="bg-img-layer"></div>
             <div id="bg-color-layer"></div>
-            <img id="el-portrait" className="card-el" data-el="portrait" alt="portrett" style={{display:'none',width:'100%',height:'302px',objectFit:'cover'}} />
+            <div id="el-portrait" className="card-el" data-el="portrait" style={{display:'none',width:'559px',height:'302px',backgroundSize:'cover',backgroundPosition:'center 20%',backgroundRepeat:'no-repeat'}}></div>
             <div id="el-portrait-placeholder" style={{position:'absolute',top:0,left:0,width:'100%',height:'302px',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:'13px',cursor:'pointer',background:'rgba(200,200,200,0.08)',border:'2px dashed var(--border)',zIndex:3}} onClick={() => (document.getElementById('main-upload') as HTMLInputElement)?.click()}>+ Klikk for å laste opp portrettfoto</div>
             <div id="el-portrait-fade" style={{position:'absolute',pointerEvents:'none',width:'100%',height:'120px',zIndex:4}}></div>
             <svg id="el-grass" className="card-el" data-el="grass" viewBox="0 0 559 50" preserveAspectRatio="none" style={{width:'559px',height:'50px'}}></svg>
@@ -955,9 +955,10 @@ async function loadMainImage(event: Event) {
   let dataURL = await fileToDataURL(file);
   dataURL = await compressImage(dataURL, 1200, 900, 0.85);
   editorState.mainImage = dataURL;
-  const img = document.getElementById('el-portrait') as HTMLImageElement;
+  const div = document.getElementById('el-portrait') as HTMLElement;
   const placeholder = document.getElementById('el-portrait-placeholder');
-  img.src = dataURL; img.style.display = 'block';
+  div.style.backgroundImage = `url('${dataURL}')`;
+  div.style.display = 'block';
   if (placeholder) placeholder.style.display = 'none';
   const thumb = document.getElementById('main-thumb') as HTMLImageElement;
   thumb.src = dataURL; thumb.classList.remove('empty');
@@ -966,8 +967,8 @@ async function loadMainImage(event: Event) {
 
 function removeMainImage() {
   editorState.mainImage = null;
-  const img = document.getElementById('el-portrait') as HTMLImageElement;
-  img.src = ''; img.style.display = 'none';
+  const div = document.getElementById('el-portrait') as HTMLElement;
+  div.style.backgroundImage = ''; div.style.display = 'none';
   const placeholder = document.getElementById('el-portrait-placeholder');
   if (placeholder) placeholder.style.display = 'flex';
   const thumb = document.getElementById('main-thumb');
@@ -980,9 +981,9 @@ function updateMainHeight() {
   const h = parseInt(g('main-height')?.value || '302');
   const hv = document.getElementById('main-height-v');
   if (hv) hv.textContent = h + 'px';
-  const img = document.getElementById('el-portrait') as HTMLImageElement;
+  const div = document.getElementById('el-portrait') as HTMLElement;
   const placeholder = document.getElementById('el-portrait-placeholder');
-  if (img) img.style.height = h + 'px';
+  if (div) div.style.height = h + 'px';
   if (placeholder) (placeholder as HTMLElement).style.height = h + 'px';
   const fade = document.getElementById('el-portrait-fade');
   if (fade) fade.style.top = (h - 120) + 'px';
@@ -996,20 +997,17 @@ function updateMainZoom() {
   const zoom = parseInt(g('main-zoom')?.value || '100');
   const zv = document.getElementById('main-zoom-v');
   if (zv) zv.textContent = zoom + '%';
-  const img = document.getElementById('el-portrait') as HTMLImageElement;
-  if (img) {
-    img.style.objectFit = 'cover';
-    img.style.transform = `scale(${zoom / 100})`;
-    img.style.transformOrigin = 'center top';
-  }
+  // Use background-size percentage: 100% = fill width, >100% = zoomed in
+  const div = document.getElementById('el-portrait') as HTMLElement;
+  if (div) div.style.backgroundSize = zoom === 100 ? 'cover' : zoom + '%';
 }
 
 function updateMainPos() {
   const pos = parseInt(g('main-pos')?.value || '20');
   const pv = document.getElementById('main-pos-v');
   if (pv) pv.textContent = pos + '%';
-  const img = document.getElementById('el-portrait') as HTMLImageElement;
-  if (img) img.style.objectPosition = `center ${pos}%`;
+  const div = document.getElementById('el-portrait') as HTMLElement;
+  if (div) div.style.backgroundPosition = `center ${pos}%`;
 }
 
 async function loadCutoutImage(event: Event) {
@@ -1751,8 +1749,8 @@ function applyProjectData(data: Record<string, unknown>) {
     if (mi) {
       if (mi.src) {
         editorState.mainImage = mi.src as string;
-        const img = document.getElementById('el-portrait') as HTMLImageElement;
-        img.src = mi.src as string; img.style.display = 'block';
+        const div = document.getElementById('el-portrait') as HTMLElement;
+        div.style.backgroundImage = `url('${mi.src as string}')`; div.style.display = 'block';
         const ph = document.getElementById('el-portrait-placeholder');
         if (ph) ph.style.display = 'none';
         const thumb = document.getElementById('main-thumb') as HTMLImageElement;
