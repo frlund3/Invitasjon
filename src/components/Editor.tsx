@@ -106,10 +106,43 @@ const MODULE_LABELS: Record<string, string> = {
   portrait: 'Portrettbilde', cutout: 'Cutout-bilde',
 };
 
+type DynamicLayerDef = {
+  type: 'text' | 'divider' | 'spacer';
+  text?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  letterSpacing?: number;
+  lineHeight?: number;
+  align?: string;
+  spacerHeight?: number;
+};
+
+function newLayerId(type: string): string {
+  return type + '_' + Math.random().toString(16).slice(2, 8);
+}
+
+function ensureDynamicLayerEl(id: string, _type: string): HTMLElement | null {
+  let el = document.getElementById('el-' + id);
+  if (!el) {
+    const container = document.getElementById('dynamic-layers-container');
+    if (!container) return null;
+    el = document.createElement('div');
+    el.id = 'el-' + id;
+    el.className = 'card-el';
+    el.setAttribute('data-el', id);
+    container.appendChild(el);
+  }
+  return el;
+}
+
 export default function Editor() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [saveVersion, setSaveVersion] = useState(0);
   const [saveEnabled, setSaveEnabled] = useState(false);
+  const [dynLayerKeys, setDynLayerKeys] = useState<string[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState('default');
   const [projectNameInput, setProjectNameInput] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -121,7 +154,8 @@ export default function Editor() {
   const triggerSave = useCallback(() => {
     pushUndo();
     setSaveVersion(v => v + 1);
-  }, []);
+    setDynLayerKeys(Object.keys(editorState.dynamicLayers));
+  }, [setDynLayerKeys]);
 
   const handleSave = useCallback(async () => {
     const state = collectState();
@@ -284,6 +318,7 @@ export default function Editor() {
     w.redo = redo;
     w.pushUndo = pushUndo;
     w.applyInvitationType = applyInvitationType;
+    w.setDynLayerKeys = setDynLayerKeys;
 
     // Keyboard shortcuts for undo/redo
     document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -352,7 +387,8 @@ export default function Editor() {
 
         <div id="tab-bar">
           <button className="tab-btn active" onClick={() => switchTab('bilder')}>Bilder</button>
-          <button className="tab-btn" onClick={() => switchTab('tekst')}>Tekst</button>
+          <button className="tab-btn" onClick={() => switchTab('lag')}>Lag</button>
+          <button className="tab-btn" onClick={() => switchTab('tekst')}>Elementer</button>
           <button className="tab-btn" onClick={() => switchTab('design')}>Design</button>
         </div>
 
@@ -508,6 +544,14 @@ export default function Editor() {
             </div>
           </div>
 
+          {/* LAG TAB */}
+          <div className="tab-panel" id="panel-lag">
+            <div style={{padding:'10px 14px 6px',fontSize:'10px',color:'var(--text-muted)',lineHeight:'1.5'}}>
+              Dra elementer for å endre rekkefølge. Trykk 👁 for å skjule/vise. Trykk ✕ for å fjerne.
+            </div>
+            <div id="module-order-list" style={{padding:'4px 8px'}}></div>
+          </div>
+
           {/* TEKST TAB */}
           <div className="tab-panel" id="panel-tekst">
             <div style={{padding:'8px 14px 4px'}}>
@@ -530,13 +574,66 @@ export default function Editor() {
                 }} />
               )}
             </div>
-            <div className="sep"></div>
-            <div className="section-label">Lag / rekkefølge</div>
-            <div id="module-order-list" style={{padding:'4px 8px'}}></div>
-
             {FIELD_KEYS.map(key => (
               <FieldAccordion key={key} fieldKey={key} onChange={triggerSave} />
             ))}
+
+            {dynLayerKeys.filter(k => editorState.dynamicLayers[k]?.type === 'text').map(k => {
+              const def = editorState.dynamicLayers[k];
+              if (!def) return null;
+              const label = editorState.customLabels[k] || 'Tekstfelt';
+              return (
+                <div key={k} id={`dyn-ctrl-${k}`} className="accordion-item">
+                  <div className="accordion-header" onClick={(e) => toggleAccordion(e.currentTarget)}>
+                    {label} <span className="accordion-arrow">▼</span>
+                  </div>
+                  <div className="accordion-body">
+                    <div className="ctrl-row"><label>Tekst</label>
+                      <textarea rows={2} value={def.text||''} onChange={e => { editorState.dynamicLayers[k].text = e.target.value; updateCardElement(k); triggerSave(); }} />
+                    </div>
+                    <div className="ctrl-row"><label>Font</label>
+                      <select value={def.fontFamily||'Lato'} onChange={e => { editorState.dynamicLayers[k].fontFamily = e.target.value; updateCardElement(k); triggerSave(); }}>
+                        {['Lato','Playfair Display','Cormorant Garamond','Dancing Script','Great Vibes','Montserrat','Open Sans','Raleway','Cinzel','Libre Baskerville','EB Garamond','Oswald'].map(f => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                    </div>
+                    <div className="ctrl-row"><label>Størrelse</label>
+                      <input type="range" min={8} max={72} value={def.fontSize||14} onChange={e => { editorState.dynamicLayers[k].fontSize = parseInt(e.target.value); updateCardElement(k); triggerSave(); }} />
+                      <span>{def.fontSize||14}px</span>
+                    </div>
+                    <div className="ctrl-row"><label>Farge</label>
+                      <input type="color" value={def.color||'#333333'} onChange={e => { editorState.dynamicLayers[k].color = e.target.value; updateCardElement(k); triggerSave(); }} />
+                    </div>
+                    <div className="ctrl-row"><label>Format</label>
+                      <button style={{fontWeight:'bold',background:def.bold?'var(--accent)':'var(--surface)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 8px',cursor:'pointer',color:'inherit'}} onClick={() => { editorState.dynamicLayers[k].bold = !def.bold; updateCardElement(k); triggerSave(); }}>B</button>
+                      <button style={{fontStyle:'italic',background:def.italic?'var(--accent)':'var(--surface)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 8px',cursor:'pointer',color:'inherit',marginLeft:4}} onClick={() => { editorState.dynamicLayers[k].italic = !def.italic; updateCardElement(k); triggerSave(); }}>I</button>
+                    </div>
+                    <div className="ctrl-row"><label>Justering</label>
+                      <select value={def.align||'center'} onChange={e => { editorState.dynamicLayers[k].align = e.target.value; updateCardElement(k); triggerSave(); }}>
+                        <option value="left">Venstre</option><option value="center">Midtstilt</option><option value="right">Høyre</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {dynLayerKeys.filter(k => editorState.dynamicLayers[k]?.type === 'spacer').map(k => {
+              const def = editorState.dynamicLayers[k];
+              if (!def) return null;
+              return (
+                <div key={k} id={`dyn-ctrl-${k}`} className="accordion-item">
+                  <div className="accordion-header" onClick={(e) => toggleAccordion(e.currentTarget)}>
+                    {editorState.customLabels[k] || 'Spacer'} <span className="accordion-arrow">▼</span>
+                  </div>
+                  <div className="accordion-body">
+                    <div className="ctrl-row"><label>Høyde</label>
+                      <input type="range" min={4} max={120} value={def.spacerHeight||20} onChange={e => { editorState.dynamicLayers[k].spacerHeight = parseInt(e.target.value); updateCardElement(k); triggerSave(); }} />
+                      <span>{def.spacerHeight||20}px</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* DESIGN TAB */}
@@ -718,6 +815,7 @@ export default function Editor() {
             <div id="el-greeting" className="card-el" data-el="greeting" style={{textAlign:'center',width:'519px'}}></div>
             <div id="el-rsvp" className="card-el" data-el="rsvp" style={{width:'479px'}}></div>
             <img id="cutout-img" className="card-el" data-el="cutout" alt="cutout" style={{display:'none',width:'220px'}} />
+            <div id="dynamic-layers-container"></div>
             <div id="snap-guides" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:25,overflow:'hidden'}}></div>
             <div id="card-border-overlay"></div>
             <div id="ornament" className="card-el" data-el="ornament"></div>
@@ -969,6 +1067,7 @@ const editorState = {
   moduleOrder: [...DEFAULT_MODULE_ORDER],
   hiddenModules: [] as string[],
   customLabels: {} as Record<string, string>,
+  dynamicLayers: {} as Record<string, DynamicLayerDef>,
   selectedElement: null as string | null,
   positions: {
     portrait:  { x: 0,   y: 0,   z: 3  },
@@ -1015,7 +1114,7 @@ function scaleCard() {
 
 function switchTab(name: string) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const tabs = ['bilder', 'tekst', 'design'];
+    const tabs = ['bilder', 'lag', 'tekst', 'design'];
     b.classList.toggle('active', tabs[i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -1040,6 +1139,47 @@ function toggleAccordion(header: Element) {
 }
 
 function updateCardElement(key: string) {
+  // Handle dynamic layers
+  if (editorState.dynamicLayers[key]) {
+    const def = editorState.dynamicLayers[key];
+    const el = ensureDynamicLayerEl(key, def.type);
+    if (!el) return;
+    if (editorState.hiddenModules.includes(key) || !editorState.moduleOrder.includes(key)) {
+      el.style.display = 'none';
+      return;
+    }
+    if (def.type === 'spacer') {
+      el.style.display = 'block';
+      el.style.height = (def.spacerHeight || 20) + 'px';
+      el.style.width = '479px';
+      el.innerHTML = '';
+    } else if (def.type === 'divider') {
+      const divColor = g('divider-color')?.value || '#ccc';
+      const divW = parseFloat(g('divider-width')?.value || '1');
+      el.style.display = 'block';
+      el.style.height = divW + 'px';
+      el.style.width = '479px';
+      el.style.background = divColor;
+      el.innerHTML = '';
+    } else if (def.type === 'text') {
+      el.style.display = 'block';
+      el.style.width = '479px';
+      const fw = def.bold ? '700' : '400';
+      const fi = def.italic ? 'italic' : 'normal';
+      el.style.fontFamily = `'${def.fontFamily || 'Lato'}', sans-serif`;
+      el.style.fontSize = (def.fontSize || 14) + 'px';
+      el.style.color = def.color || '#333333';
+      el.style.fontWeight = fw;
+      el.style.fontStyle = fi;
+      el.style.letterSpacing = (def.letterSpacing || 0) + 'px';
+      el.style.textAlign = (def.align || 'center') as any;
+      el.textContent = def.text || '';
+    }
+    if (!editorState.positions[key]) editorState.positions[key] = { x: 40, y: 500, z: 6 };
+    applyPosition(key);
+    return;
+  }
+
   const elId = (key === 'date') ? 'datebadge' : key;
   const el = document.getElementById('el-' + elId);
   if (!el) return;
@@ -1130,11 +1270,25 @@ function updateDividerElements() {
       }
     }
   });
+  // Dynamic divider layers
+  Object.entries(editorState.dynamicLayers).forEach(([id, def]) => {
+    if (def.type !== 'divider') return;
+    const el = document.getElementById('el-' + id);
+    if (!el) return;
+    if (!editorState.moduleOrder.includes(id) || editorState.hiddenModules.includes(id)) {
+      el.style.display = 'none';
+    } else {
+      el.style.height = divW + 'px';
+      el.style.background = divColor;
+      el.style.display = '';
+    }
+  });
 }
 
 function updateAllCardElements() {
   FIELD_KEYS.forEach(k => updateCardElement(k));
   updateDividerElements();
+  Object.keys(editorState.dynamicLayers).forEach(k => updateCardElement(k));
 }
 
 function _buildContentNow() {
@@ -1841,7 +1995,7 @@ function renderModuleOrderUI(triggerSave?: () => void) {
   list.innerHTML = '';
   editorState.moduleOrder.forEach((key, index) => {
     const item = document.createElement('div');
-    item.className = 'module-drag-item';
+    item.className = 'module-drag-item' + (editorState.selectedElement === key ? ' layer-selected' : '');
     item.setAttribute('draggable', 'true');
     item.setAttribute('data-key', key);
     item.setAttribute('data-index', String(index));
@@ -1884,6 +2038,38 @@ function renderModuleOrderUI(triggerSave?: () => void) {
   });
   addRow.appendChild(sel);
   list.appendChild(addRow);
+
+  // Dynamic layer add buttons
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'padding:4px;display:flex;gap:4px;flex-wrap:wrap;';
+  btnRow.innerHTML = `
+    <button class="dyn-add-btn" data-type="text" style="flex:1;font-size:10px;padding:4px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:inherit;cursor:pointer;">+ Tekstfelt</button>
+    <button class="dyn-add-btn" data-type="divider" style="flex:1;font-size:10px;padding:4px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:inherit;cursor:pointer;">+ Skillelinje</button>
+    <button class="dyn-add-btn" data-type="spacer" style="flex:1;font-size:10px;padding:4px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:inherit;cursor:pointer;">+ Spacer</button>`;
+  list.appendChild(btnRow);
+  btnRow.querySelectorAll('.dyn-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const type = (btn as HTMLElement).getAttribute('data-type') as 'text'|'divider'|'spacer';
+      const id = newLayerId(type);
+      const defaults: DynamicLayerDef = type === 'text'
+        ? { type, text: '', fontFamily: 'Lato', fontSize: 14, color: '#333333', bold: false, italic: false, letterSpacing: 0, lineHeight: 16, align: 'center' }
+        : type === 'divider'
+        ? { type }
+        : { type, spacerHeight: 20 };
+      editorState.dynamicLayers[id] = defaults;
+      editorState.moduleOrder.push(id);
+      editorState.positions[id] = { x: 40, y: 550, z: 6 };
+      ensureDynamicLayerEl(id, type);
+      // Sync React state immediately so Elementer-fanen re-renders
+      const setKeys = (window as unknown as Record<string, unknown>).setDynLayerKeys as ((keys: string[]) => void) | undefined;
+      if (setKeys) setKeys(Object.keys(editorState.dynamicLayers));
+      renderModuleOrderUI(triggerSave);
+      updateAllCardElements();
+      if (triggerSave) attachCardDrag(id, triggerSave);
+      if (triggerSave) triggerSave();
+    });
+  });
 
   attachDragHandlers(list, triggerSave);
 
@@ -1932,6 +2118,16 @@ function renderModuleOrderUI(triggerSave?: () => void) {
       if (triggerSave) triggerSave();
     });
   });
+
+  list.querySelectorAll('.module-drag-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      // Don't intercept clicks on buttons or the rename input
+      if (target.closest('button') || target.tagName === 'INPUT') return;
+      const key = (item as HTMLElement).getAttribute('data-key')!;
+      selectCardElement(key);
+    });
+  });
 }
 
 function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
@@ -1972,8 +2168,12 @@ function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
       newOrder.splice(toIdx, 0, moved);
       editorState.moduleOrder = newOrder;
 
+      // Sync z-index: higher index in list = higher z (drawn on top)
+      syncModuleZIndices();
+
       renderModuleOrderUI(triggerSave);
       updateAllCardElements();
+      applyAllPositions();
       if (triggerSave) triggerSave();
     });
   });
@@ -1981,6 +2181,18 @@ function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
 
 // ============================================================
 // FREE-POSITION DRAG SYSTEM
+// ============================================================
+function syncModuleZIndices() {
+  // Bottom of list = lowest z, top of list = highest z (drawn on top)
+  // moduleOrder[0] is topmost in the list = should be on top visually
+  const total = editorState.moduleOrder.length;
+  editorState.moduleOrder.forEach((id, idx) => {
+    const elId = id === 'date' ? 'datebadge' : id;
+    if (!editorState.positions[elId]) editorState.positions[elId] = { x: 0, y: 0, z: 6 };
+    editorState.positions[elId].z = total - idx + 5; // higher index in array = lower z
+  });
+}
+
 // ============================================================
 function applyPosition(id: string) {
   const el = id === 'cutout' ? document.getElementById('cutout-img') : id === 'ornament' ? document.getElementById('ornament') : document.getElementById('el-' + id);
@@ -2001,6 +2213,9 @@ function applyAllPositions() {
 function selectCardElement(id: string) {
   editorState.selectedElement = id;
   document.querySelectorAll('.card-el').forEach(e => e.classList.remove('selected'));
+  document.querySelectorAll('.module-drag-item').forEach(e => e.classList.remove('layer-selected'));
+  const layerRow = document.querySelector(`.module-drag-item[data-key="${id}"]`);
+  if (layerRow) layerRow.classList.add('layer-selected');
   const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
   if (el) el.classList.add('selected');
   const FIELD_KEYS_LOCAL = ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp'];
@@ -2018,6 +2233,10 @@ function selectCardElement(id: string) {
     switchTab('bilder');
   } else if (id.startsWith('divider')) {
     switchTab('design');
+  } else if (editorState.dynamicLayers[id]) {
+    switchTab('elementer');
+    const dynEl = document.getElementById('dyn-ctrl-' + id);
+    if (dynEl) dynEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   const readout = document.getElementById('pos-readout');
   if (readout) {
@@ -2177,6 +2396,7 @@ function collectState() {
     moduleOrder: [...editorState.moduleOrder],
     hiddenModules: [...editorState.hiddenModules],
     customLabels: { ...editorState.customLabels },
+    dynamicLayers: JSON.parse(JSON.stringify(editorState.dynamicLayers)),
     positions: JSON.parse(JSON.stringify(editorState.positions)),
     moduleWidths: { ...editorState.moduleWidths },
     moduleAligns: { ...editorState.moduleAligns },
@@ -2390,6 +2610,18 @@ function applyProjectData(data: Record<string, unknown>) {
     });
   }
 
+  if (data.dynamicLayers && typeof data.dynamicLayers === 'object') {
+    editorState.dynamicLayers = data.dynamicLayers as Record<string, DynamicLayerDef>;
+    Object.entries(editorState.dynamicLayers).forEach(([id, def]) => {
+      ensureDynamicLayerEl(id, def.type);
+      if (!editorState.positions[id]) editorState.positions[id] = { x: 40, y: 550, z: 6 };
+      const ts = (window as unknown as Record<string, unknown>).triggerSave as (() => void) | undefined;
+      if (ts) attachCardDrag(id, ts);
+    });
+    const setKeys = (window as unknown as Record<string, unknown>).setDynLayerKeys as ((keys: string[]) => void) | undefined;
+    if (setKeys) setKeys(Object.keys(editorState.dynamicLayers));
+  }
+
   updateAllCardElements();
 }
 
@@ -2587,34 +2819,26 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
     ctx.fillRect(0, fadeTop, W, 120);
   }
 
-  // ── 5 & 6. Text fields and dividers ──────────────────────
-  // Helper to preload a Google Font by trying to measure with it
+  // ── Helper: ensure font loaded ─────────────────────────
   async function ensureFont(family: string, weight: string, style: string) {
-    try {
-      await document.fonts.load(`${style} ${weight} 16px '${family}'`);
-    } catch (_e) { /* ignore */ }
+    try { await document.fonts.load(`${style} ${weight} 16px '${family}'`); } catch (_e) { /* ignore */ }
   }
 
-  // Draw divider line
-  function drawDivider(divKey: string) {
-    const pos = editorState.positions[divKey] || { x: 40, y: 336 };
+  // ── Draw layer functions ──────────────────────────────────
+
+  function drawDividerLayer(key: string) {
+    const pos = editorState.positions[key] || { x: 40, y: 336 };
     const divColor = g('divider-color')?.value || '#ccc';
     const divW = parseFloat(g('divider-width')?.value || '1');
     if (divW <= 0) return;
     ctx.save();
-    ctx.strokeStyle = divColor;
-    ctx.lineWidth = divW;
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    ctx.lineTo(pos.x + 479, pos.y);
-    ctx.stroke();
+    ctx.strokeStyle = divColor; ctx.lineWidth = divW;
+    ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(pos.x + 479, pos.y); ctx.stroke();
     ctx.restore();
   }
 
-  // Draw a text field
-  async function drawTextField(key: string) {
-    const elId = (key === 'date') ? 'datebadge' : key;
-    const pos = editorState.positions[elId] || { x: 0, y: 312 };
+  async function drawStaticTextField(key: string) {
+    const pos = editorState.positions[key] || { x: 0, y: 312 };
     const font = g('fn-' + key)?.value || 'Lato';
     const size = parseInt(g('fs-' + key)?.value || '14');
     const color = g('fc-' + key)?.value || '#333333';
@@ -2623,68 +2847,26 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
     const spacing = parseFloat(g('fls-' + key)?.value || '0');
     const lhRaw = parseInt(g('flh-' + key)?.value || '16');
     const lh = (lhRaw / 10) * size;
-
-    const textEl = g('in-' + key) as HTMLTextAreaElement | HTMLInputElement;
-    const rawText = textEl ? (textEl.value || '') : '';
-
-    const fw = bold ? '700' : '400';
-    const fi = italic ? 'italic' : 'normal';
-
+    const rawText = (g('in-' + key) as HTMLTextAreaElement)?.value || '';
+    const fw = bold ? '700' : '400'; const fi = italic ? 'italic' : 'normal';
     await ensureFont(font, fw, fi);
-
     ctx.save();
     ctx.font = `${fi} ${fw} ${size}px '${font}', serif`;
-    ctx.fillStyle = color;
-    ctx.textBaseline = 'top';
+    ctx.fillStyle = color; ctx.textBaseline = 'top';
     (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = spacing + 'px';
-
-    if (key === 'date') {
-      // Date badge — drawn separately in step 8
-      ctx.restore();
-      return;
-    }
-
-    if (key === 'topline') {
-      const elWidth = 519;
-      const centerX = pos.x + elWidth / 2;
-      ctx.textAlign = 'center';
-      ctx.fillText(rawText.toUpperCase(), centerX, pos.y);
-    } else if (key === 'program' || key === 'rsvp') {
-      // multiline
-      const elWidth = 479;
-      const centerX = pos.x + elWidth / 2;
-      ctx.textAlign = 'center';
-      const lines = rawText.split('\n');
-      lines.forEach((line, i) => {
-        ctx.fillText(line, centerX, pos.y + i * lh);
-      });
-    } else {
-      // single-line centered
-      const elWidth = 519;
-      const centerX = pos.x + elWidth / 2;
-      ctx.textAlign = 'center';
-      ctx.fillText(rawText, centerX, pos.y);
-    }
-
+    const elWidth = editorState.moduleWidths[key] || 519;
+    const align = editorState.moduleAligns[key] || 'center';
+    ctx.textAlign = align as CanvasTextAlign;
+    const anchorX = align === 'center' ? pos.x + elWidth / 2 : align === 'right' ? pos.x + elWidth : pos.x;
+    if (key === 'topline') { ctx.fillText(rawText.toUpperCase(), anchorX, pos.y); }
+    else if (key === 'program') { rawText.split('\n').forEach((line: string, i: number) => ctx.fillText(line, anchorX, pos.y + i * lh)); }
+    else { ctx.fillText(rawText, anchorX, pos.y); }
     ctx.restore();
   }
 
-  // Draw dividers
-  for (const divKey of ['divider1', 'divider2', 'divider3']) {
-    if (editorState.moduleOrder.includes(divKey) && !editorState.hiddenModules.includes(divKey)) {
-      drawDivider(divKey);
-    }
-  }
-
-  // Draw text fields (all except 'date' which is handled as badge)
-  for (const key of ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp']) {
-    if (editorState.moduleOrder.includes(key) && !editorState.hiddenModules.includes(key)) {
-      await drawTextField(key);
-    }
-  }
-
-  // ── 8. Date badge ─────────────────────────────────────────
-  if (editorState.moduleOrder.includes('datebadge') && !editorState.hiddenModules.includes('datebadge') && !editorState.hiddenModules.includes('date')) {
+  async function drawDateBadge() {
+    if (!editorState.moduleOrder.includes('datebadge')) return;
+    if (editorState.hiddenModules.includes('datebadge') || editorState.hiddenModules.includes('date')) return;
     const badgePos = editorState.positions.datebadge || { x: 80, y: 440 };
     const badgeBg = g('badge-bg')?.value || '#8b5a2b';
     const badgeRadius = parseInt(g('badge-radius')?.value || '20');
@@ -2694,186 +2876,199 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
     const bold = editorState.fields['date']?.bold ?? false;
     const italic = editorState.fields['date']?.italic ?? false;
     const spacing = parseFloat(g('fls-date')?.value || '0');
-    const fw = bold ? '700' : '400';
-    const fi = italic ? 'italic' : 'normal';
-    const dateEl = g('in-date');
-    const dateText = dateEl ? dateEl.value || '' : '';
+    const fw = bold ? '700' : '400'; const fi = italic ? 'italic' : 'normal';
+    const dateText = g('in-date')?.value || '';
     const paddingX = 22, paddingY = 6;
-
     await ensureFont(font, fw, fi);
-
     ctx.save();
     ctx.font = `${fi} ${fw} ${size}px '${font}', sans-serif`;
     (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = spacing + 'px';
-    const metrics = ctx.measureText(dateText);
-    const textW = metrics.width;
-    const boxW = textW + paddingX * 2;
+    const boxW = ctx.measureText(dateText).width + paddingX * 2;
     const boxH = size + paddingY * 2;
-
     roundRect(ctx, badgePos.x, badgePos.y, boxW, boxH, badgeRadius);
-    ctx.fillStyle = badgeBg;
-    ctx.fill();
-
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.fillStyle = badgeBg; ctx.fill();
+    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(dateText, badgePos.x + boxW / 2, badgePos.y + paddingY);
     ctx.restore();
   }
 
-  // ── 9. RSVP box (background + border) ───────────────────
-  {
+  async function drawRsvpBox() {
+    if (editorState.hiddenModules.includes('rsvp')) return;
     const rsvpVisible = (g('rsvp-visible') as HTMLInputElement)?.checked !== false;
-    if (rsvpVisible) {
-      const rsvpPos = editorState.positions.rsvp || { x: 40, y: 604 };
-      const rsvpBg = editorState.rsvpTransparent ? null : (g('rsvp-bg')?.value || '#f0e8d8');
-      const rsvpBorderColor = g('rsvp-border-color')?.value || '#c8a068';
-      const rsvpBorderW = parseFloat(g('rsvp-border-w')?.value || '1');
-      const rsvpBorderStyleVal = g('rsvp-border-style')?.value || 'solid';
-      const rsvpRadius = parseInt(g('rsvp-radius')?.value || '8');
-      const rsvpPadding = parseInt(g('rsvp-padding')?.value || '12');
-
-      // Measure RSVP text height to determine box size
-      const font = g('fn-rsvp')?.value || 'Lato';
-      const size = parseInt(g('fs-rsvp')?.value || '11');
-      const bold = editorState.fields['rsvp']?.bold ?? false;
-      const italic = editorState.fields['rsvp']?.italic ?? false;
-      const fw = bold ? '700' : '400';
-      const fi = italic ? 'italic' : 'normal';
-      const lhRaw = parseInt(g('flh-rsvp')?.value || '16');
-      const lh = (lhRaw / 10) * size;
-
-      const rsvpTextEl = g('in-rsvp') as HTMLTextAreaElement;
-      const rsvpText = rsvpTextEl ? rsvpTextEl.value || '' : '';
-      const rsvpLines = rsvpText.split('\n');
-      const textH = rsvpLines.length * lh;
-
-      const boxW = 479;
-      const boxH = textH + rsvpPadding * 2;
-
-      ctx.save();
-      roundRect(ctx, rsvpPos.x, rsvpPos.y, boxW, boxH, rsvpRadius);
-      if (rsvpBg) {
-        ctx.fillStyle = rsvpBg;
-        ctx.fill();
-      }
-      if (rsvpBorderW > 0 && rsvpBorderStyleVal !== 'none') {
-        ctx.strokeStyle = rsvpBorderColor;
-        ctx.lineWidth = rsvpBorderW;
-        if (rsvpBorderStyleVal === 'dashed') ctx.setLineDash([8, 4]);
-        else if (rsvpBorderStyleVal === 'dotted') ctx.setLineDash([2, 4]);
-        else ctx.setLineDash([]);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Draw RSVP text on top of box
-      await ensureFont(font, fw, fi);
-      ctx.save();
-      ctx.font = `${fi} ${fw} ${size}px '${font}', serif`;
-      ctx.fillStyle = g('fc-rsvp')?.value || '#333333';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      const centerX = rsvpPos.x + boxW / 2;
-      rsvpLines.forEach((line, i) => {
-        ctx.fillText(line, centerX, rsvpPos.y + rsvpPadding + i * lh);
-      });
-      ctx.restore();
+    if (!rsvpVisible) return;
+    const rsvpPos = editorState.positions.rsvp || { x: 40, y: 604 };
+    const rsvpBg = editorState.rsvpTransparent ? null : (g('rsvp-bg')?.value || '#f0e8d8');
+    const rsvpBorderColor = g('rsvp-border-color')?.value || '#c8a068';
+    const rsvpBorderW = parseFloat(g('rsvp-border-w')?.value || '1');
+    const rsvpBorderStyleVal = g('rsvp-border-style')?.value || 'solid';
+    const rsvpRadius = parseInt(g('rsvp-radius')?.value || '8');
+    const rsvpPadding = parseInt(g('rsvp-padding')?.value || '12');
+    const font = g('fn-rsvp')?.value || 'Lato';
+    const size = parseInt(g('fs-rsvp')?.value || '11');
+    const bold = editorState.fields['rsvp']?.bold ?? false;
+    const italic = editorState.fields['rsvp']?.italic ?? false;
+    const fw = bold ? '700' : '400'; const fi = italic ? 'italic' : 'normal';
+    const lh = (parseInt(g('flh-rsvp')?.value || '16') / 10) * size;
+    const rsvpLines = ((g('in-rsvp') as HTMLTextAreaElement)?.value || '').split('\n');
+    const boxW = editorState.moduleWidths['rsvp'] || 479;
+    const boxH = rsvpLines.length * lh + rsvpPadding * 2;
+    ctx.save();
+    roundRect(ctx, rsvpPos.x, rsvpPos.y, boxW, boxH, rsvpRadius);
+    if (rsvpBg) { ctx.fillStyle = rsvpBg; ctx.fill(); }
+    if (rsvpBorderW > 0 && rsvpBorderStyleVal !== 'none') {
+      ctx.strokeStyle = rsvpBorderColor; ctx.lineWidth = rsvpBorderW;
+      if (rsvpBorderStyleVal === 'dashed') ctx.setLineDash([8, 4]);
+      else if (rsvpBorderStyleVal === 'dotted') ctx.setLineDash([2, 4]);
+      else ctx.setLineDash([]);
+      ctx.stroke();
     }
+    ctx.restore();
+    await ensureFont(font, fw, fi);
+    ctx.save();
+    ctx.font = `${fi} ${fw} ${size}px '${font}', serif`;
+    ctx.fillStyle = g('fc-rsvp')?.value || '#333333';
+    const rsvpAlign = (editorState.moduleAligns['rsvp'] || 'left') as CanvasTextAlign;
+    ctx.textAlign = rsvpAlign; ctx.textBaseline = 'top';
+    const anchorX = rsvpAlign === 'center' ? rsvpPos.x + boxW / 2 : rsvpAlign === 'right' ? rsvpPos.x + boxW - rsvpPadding : rsvpPos.x + rsvpPadding;
+    rsvpLines.forEach((line: string, i: number) => ctx.fillText(line, anchorX, rsvpPos.y + rsvpPadding + i * lh));
+    ctx.restore();
   }
 
-  // ── 10. Cutout image ──────────────────────────────────────
-  if (editorState.cutoutImage) {
+  async function drawCutoutLayer() {
+    if (!editorState.cutoutImage) return;
     try {
       const cutoutImg = await loadImg(editorState.cutoutImage);
       const cutoutSize = parseInt(g('cutout-size')?.value || '220');
       const cutoutRight = parseInt(g('cutout-right')?.value || '-10');
       const cutoutBottom = parseInt(g('cutout-bottom')?.value || '30');
-
-      // In the DOM, cutout uses right/bottom. Convert to left/top for canvas:
-      const aspectRatio = cutoutImg.naturalHeight / cutoutImg.naturalWidth;
       const drawW = cutoutSize;
-      const drawH = cutoutSize * aspectRatio;
-      const drawX = W - cutoutSize - cutoutRight;
-      const drawY = H - drawH - cutoutBottom;
-
-      ctx.drawImage(cutoutImg, drawX, drawY, drawW, drawH);
-    } catch (_e) {
-      // ignore cutout load failure
-    }
+      const drawH = cutoutSize * (cutoutImg.naturalHeight / cutoutImg.naturalWidth);
+      ctx.drawImage(cutoutImg, W - cutoutSize - cutoutRight, H - drawH - cutoutBottom, drawW, drawH);
+    } catch (_e) { /* ignore */ }
   }
 
-  // ── 11. Ornament ──────────────────────────────────────────
-  {
+  async function drawDynamicTextLayer(key: string) {
+    const def = editorState.dynamicLayers[key];
+    if (!def || def.type !== 'text') return;
+    const pos = editorState.positions[key] || { x: 40, y: 550 };
+    const font = def.fontFamily || 'Lato';
+    const size = def.fontSize || 14;
+    const fw = def.bold ? '700' : '400'; const fi = def.italic ? 'italic' : 'normal';
+    const spacing = def.letterSpacing || 0;
+    const lh = ((def.lineHeight || 16) / 10) * size;
+    await ensureFont(font, fw, fi);
+    ctx.save();
+    ctx.font = `${fi} ${fw} ${size}px '${font}', serif`;
+    ctx.fillStyle = def.color || '#333333'; ctx.textBaseline = 'top';
+    const align = (def.align || 'center') as CanvasTextAlign;
+    ctx.textAlign = align;
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = spacing + 'px';
+    const elWidth = 479;
+    const anchorX = align === 'center' ? pos.x + elWidth / 2 : align === 'right' ? pos.x + elWidth : pos.x;
+    (def.text || '').split('\n').forEach((line: string, i: number) => ctx.fillText(line, anchorX, pos.y + i * lh));
+    ctx.restore();
+  }
+
+  function drawOrnamentLayer() {
     const ornamentVisible = (g('ornament-visible') as HTMLInputElement)?.checked;
-    if (ornamentVisible) {
-      const c2 = g('ornament-color')?.value || '#c8a068';
-      const ornamentOpacity = parseInt((g('ornament-opacity') as HTMLInputElement)?.value || '80') / 100;
-      const ornamentType = g('ornament-type')?.value || 'flower';
-      const ornamentPos = editorState.positions['ornament'] || { x: 479, y: 674 };
-      const ox = ornamentPos.x;
-      const oy = ornamentPos.y;
-      ctx.save();
-      ctx.globalAlpha = ornamentOpacity;
-      ctx.strokeStyle = c2; ctx.fillStyle = c2;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(ox+30, oy+30, 28, 0, Math.PI*2); ctx.stroke();
-
-      if (ornamentType === 'flower') {
-        ctx.globalAlpha = ornamentOpacity * 0.15;
-        ctx.beginPath(); ctx.moveTo(ox+30,oy+8); ctx.bezierCurveTo(ox+20,oy+14,ox+10,oy+22,ox+10,oy+30); ctx.bezierCurveTo(ox+10,oy+42,ox+20,oy+52,ox+30,oy+52); ctx.bezierCurveTo(ox+40,oy+52,ox+50,oy+42,ox+50,oy+30); ctx.bezierCurveTo(ox+50,oy+22,ox+40,oy+14,ox+30,oy+8); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.4;
-        ctx.save(); ctx.translate(ox+22,oy+26); ctx.rotate(-25*Math.PI/180); ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.save(); ctx.translate(ox+38,oy+26); ctx.rotate(25*Math.PI/180); ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.beginPath(); ctx.ellipse(ox+30,oy+36,6,8,0,0,Math.PI*2); ctx.fill();
-
-      } else if (ornamentType === 'lily') {
-        ctx.globalAlpha = ornamentOpacity * 0.5;
-        ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+24,oy+16,ox+24,oy+24,ox+24,oy+28); ctx.bezierCurveTo(ox+24,oy+34,ox+27,oy+38,ox+30,oy+40); ctx.bezierCurveTo(ox+33,oy+38,ox+36,oy+34,ox+36,oy+28); ctx.bezierCurveTo(ox+36,oy+24,ox+36,oy+16,ox+30,oy+10); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.35;
-        ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+22,oy+14,ox+16,oy+18,ox+14,oy+26); ctx.bezierCurveTo(ox+11,oy+32,ox+13,oy+38,ox+16,oy+41); ctx.bezierCurveTo(ox+20,oy+38,ox+24,oy+34,ox+26,oy+28); ctx.bezierCurveTo(ox+28,oy+22,ox+30,oy+10,ox+30,oy+10); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+38,oy+14,ox+44,oy+18,ox+46,oy+26); ctx.bezierCurveTo(ox+49,oy+32,ox+47,oy+38,ox+44,oy+41); ctx.bezierCurveTo(ox+40,oy+38,ox+36,oy+34,ox+34,oy+28); ctx.bezierCurveTo(ox+32,oy+22,ox+30,oy+10,ox+30,oy+10); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.6;
-        ctx.beginPath(); ctx.arc(ox+30,oy+41,4,0,Math.PI*2); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.5;
-        ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ox+30,oy+45); ctx.lineTo(ox+30,oy+52); ctx.stroke();
-
-      } else if (ornamentType === 'crown') {
-        ctx.globalAlpha = ornamentOpacity * 0.35;
-        ctx.beginPath(); ctx.moveTo(ox+10,oy+40); ctx.lineTo(ox+10,oy+22); ctx.lineTo(ox+18,oy+32); ctx.lineTo(ox+30,oy+14); ctx.lineTo(ox+42,oy+32); ctx.lineTo(ox+50,oy+22); ctx.lineTo(ox+50,oy+40); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.5;
-        ctx.beginPath(); ctx.rect(ox+10,oy+40,40,5); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.7;
-        ctx.beginPath(); ctx.arc(ox+10,oy+22,2.5,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(ox+30,oy+14,2.5,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(ox+50,oy+22,2.5,0,Math.PI*2); ctx.fill();
-
-      } else if (ornamentType === 'heart') {
-        ctx.globalAlpha = ornamentOpacity * 0.4;
-        ctx.beginPath(); ctx.moveTo(ox+30,oy+46); ctx.bezierCurveTo(ox+20,oy+40,ox+10,oy+34,ox+10,oy+22); ctx.bezierCurveTo(ox+10,oy+15,ox+16,oy+10,ox+22,oy+12); ctx.bezierCurveTo(ox+26,oy+13,ox+29,oy+17,ox+30,oy+20); ctx.bezierCurveTo(ox+31,oy+17,ox+34,oy+13,ox+38,oy+12); ctx.bezierCurveTo(ox+44,oy+10,ox+50,oy+15,ox+50,oy+22); ctx.bezierCurveTo(ox+50,oy+34,ox+40,oy+40,ox+30,oy+46); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = ornamentOpacity * 0.2;
-        ctx.beginPath(); ctx.moveTo(ox+30,oy+40); ctx.bezierCurveTo(ox+20,oy+34,ox+16,oy+28,ox+16,oy+22); ctx.bezierCurveTo(ox+16,oy+18,ox+19,oy+15,ox+22,oy+16); ctx.bezierCurveTo(ox+25,oy+17,ox+28,oy+20,ox+30,oy+24); ctx.bezierCurveTo(ox+32,oy+20,ox+35,oy+17,ox+38,oy+16); ctx.bezierCurveTo(ox+41,oy+15,ox+44,oy+18,ox+44,oy+22); ctx.bezierCurveTo(ox+44,oy+28,ox+40,oy+34,ox+30,oy+40); ctx.closePath(); ctx.fill();
-
-      } else if (ornamentType === 'wreath') {
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = ornamentOpacity * 0.4;
-        ctx.beginPath(); ctx.arc(ox+30,oy+30,16,0,Math.PI*2); ctx.stroke();
-        ctx.globalAlpha = ornamentOpacity * 0.35;
-        ctx.beginPath(); ctx.ellipse(ox+14,oy+30,5,8,0,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(ox+46,oy+30,5,8,0,0,Math.PI*2); ctx.fill();
-        ctx.save(); ctx.translate(ox+30,oy+14); ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.ellipse(0,0,5,8,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.save(); ctx.translate(ox+30,oy+46); ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.ellipse(0,0,5,8,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.globalAlpha = ornamentOpacity * 0.25;
-        ctx.save(); ctx.translate(ox+18,oy+18); ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.save(); ctx.translate(ox+42,oy+18); ctx.rotate(-Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.save(); ctx.translate(ox+18,oy+42); ctx.rotate(-Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.save(); ctx.translate(ox+42,oy+42); ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
-        ctx.globalAlpha = ornamentOpacity * 0.6;
-        ctx.beginPath(); ctx.arc(ox+30,oy+30,3,0,Math.PI*2); ctx.fill();
-      }
-
-      ctx.restore();
+    if (!ornamentVisible) return;
+    const c2 = g('ornament-color')?.value || '#c8a068';
+    const ornamentOpacity = parseInt((g('ornament-opacity') as HTMLInputElement)?.value || '80') / 100;
+    const ornamentType = g('ornament-type')?.value || 'flower';
+    const ornamentPos = editorState.positions['ornament'] || { x: 479, y: 674 };
+    const ox = ornamentPos.x; const oy = ornamentPos.y;
+    ctx.save();
+    ctx.globalAlpha = ornamentOpacity; ctx.strokeStyle = c2; ctx.fillStyle = c2; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(ox+30,oy+30,28,0,Math.PI*2); ctx.stroke();
+    if (ornamentType === 'flower') {
+      ctx.globalAlpha = ornamentOpacity*0.15; ctx.beginPath(); ctx.moveTo(ox+30,oy+8); ctx.bezierCurveTo(ox+20,oy+14,ox+10,oy+22,ox+10,oy+30); ctx.bezierCurveTo(ox+10,oy+42,ox+20,oy+52,ox+30,oy+52); ctx.bezierCurveTo(ox+40,oy+52,ox+50,oy+42,ox+50,oy+30); ctx.bezierCurveTo(ox+50,oy+22,ox+40,oy+14,ox+30,oy+8); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.4;
+      ctx.save(); ctx.translate(ox+22,oy+26); ctx.rotate(-25*Math.PI/180); ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(ox+38,oy+26); ctx.rotate(25*Math.PI/180); ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.beginPath(); ctx.ellipse(ox+30,oy+36,6,8,0,0,Math.PI*2); ctx.fill();
+    } else if (ornamentType === 'lily') {
+      ctx.globalAlpha = ornamentOpacity*0.5; ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+24,oy+16,ox+24,oy+24,ox+24,oy+28); ctx.bezierCurveTo(ox+24,oy+34,ox+27,oy+38,ox+30,oy+40); ctx.bezierCurveTo(ox+33,oy+38,ox+36,oy+34,ox+36,oy+28); ctx.bezierCurveTo(ox+36,oy+24,ox+36,oy+16,ox+30,oy+10); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.35;
+      ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+22,oy+14,ox+16,oy+18,ox+14,oy+26); ctx.bezierCurveTo(ox+11,oy+32,ox+13,oy+38,ox+16,oy+41); ctx.bezierCurveTo(ox+20,oy+38,ox+24,oy+34,ox+26,oy+28); ctx.bezierCurveTo(ox+28,oy+22,ox+30,oy+10,ox+30,oy+10); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+38,oy+14,ox+44,oy+18,ox+46,oy+26); ctx.bezierCurveTo(ox+49,oy+32,ox+47,oy+38,ox+44,oy+41); ctx.bezierCurveTo(ox+40,oy+38,ox+36,oy+34,ox+34,oy+28); ctx.bezierCurveTo(ox+32,oy+22,ox+30,oy+10,ox+30,oy+10); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.6; ctx.beginPath(); ctx.arc(ox+30,oy+41,4,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.5; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(ox+30,oy+45); ctx.lineTo(ox+30,oy+52); ctx.stroke();
+    } else if (ornamentType === 'crown') {
+      ctx.globalAlpha = ornamentOpacity*0.35; ctx.beginPath(); ctx.moveTo(ox+10,oy+40); ctx.lineTo(ox+10,oy+22); ctx.lineTo(ox+18,oy+32); ctx.lineTo(ox+30,oy+14); ctx.lineTo(ox+42,oy+32); ctx.lineTo(ox+50,oy+22); ctx.lineTo(ox+50,oy+40); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.5; ctx.beginPath(); ctx.rect(ox+10,oy+40,40,5); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.7;
+      ctx.beginPath(); ctx.arc(ox+10,oy+22,2.5,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ox+30,oy+14,2.5,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ox+50,oy+22,2.5,0,Math.PI*2); ctx.fill();
+    } else if (ornamentType === 'heart') {
+      ctx.globalAlpha = ornamentOpacity*0.4; ctx.beginPath(); ctx.moveTo(ox+30,oy+46); ctx.bezierCurveTo(ox+20,oy+40,ox+10,oy+34,ox+10,oy+22); ctx.bezierCurveTo(ox+10,oy+15,ox+16,oy+10,ox+22,oy+12); ctx.bezierCurveTo(ox+26,oy+13,ox+29,oy+17,ox+30,oy+20); ctx.bezierCurveTo(ox+31,oy+17,ox+34,oy+13,ox+38,oy+12); ctx.bezierCurveTo(ox+44,oy+10,ox+50,oy+15,ox+50,oy+22); ctx.bezierCurveTo(ox+50,oy+34,ox+40,oy+40,ox+30,oy+46); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = ornamentOpacity*0.2; ctx.beginPath(); ctx.moveTo(ox+30,oy+40); ctx.bezierCurveTo(ox+20,oy+34,ox+16,oy+28,ox+16,oy+22); ctx.bezierCurveTo(ox+16,oy+18,ox+19,oy+15,ox+22,oy+16); ctx.bezierCurveTo(ox+25,oy+17,ox+28,oy+20,ox+30,oy+24); ctx.bezierCurveTo(ox+32,oy+20,ox+35,oy+17,ox+38,oy+16); ctx.bezierCurveTo(ox+41,oy+15,ox+44,oy+18,ox+44,oy+22); ctx.bezierCurveTo(ox+44,oy+28,ox+40,oy+34,ox+30,oy+40); ctx.closePath(); ctx.fill();
+    } else if (ornamentType === 'wreath') {
+      ctx.lineWidth=1; ctx.globalAlpha=ornamentOpacity*0.4; ctx.beginPath(); ctx.arc(ox+30,oy+30,16,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=ornamentOpacity*0.35;
+      ctx.beginPath(); ctx.ellipse(ox+14,oy+30,5,8,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(ox+46,oy+30,5,8,0,0,Math.PI*2); ctx.fill();
+      ctx.save(); ctx.translate(ox+30,oy+14); ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.ellipse(0,0,5,8,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(ox+30,oy+46); ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.ellipse(0,0,5,8,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.globalAlpha=ornamentOpacity*0.25;
+      ctx.save(); ctx.translate(ox+18,oy+18); ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(ox+42,oy+18); ctx.rotate(-Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(ox+18,oy+42); ctx.rotate(-Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(ox+42,oy+42); ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.globalAlpha=ornamentOpacity*0.6; ctx.beginPath(); ctx.arc(ox+30,oy+30,3,0,Math.PI*2); ctx.fill();
     }
+    ctx.restore();
+  }
+
+  // ── 5. Draw all layers sorted by z-index (lowest z first = furthest back) ──
+  // Build sorted layer list from positions, excluding always-bottom items (bg/fade/border)
+  type LayerEntry = { id: string; z: number };
+  const allLayers: LayerEntry[] = [];
+
+  // Portrait has its own fixed z from positions
+  if (editorState.mainImage || true) {
+    allLayers.push({ id: 'portrait', z: editorState.positions.portrait?.z ?? 3 });
+  }
+  // Cutout
+  if (editorState.cutoutImage) {
+    allLayers.push({ id: 'cutout', z: editorState.positions.cutout?.z ?? 10 });
+  }
+  // Ornament
+  if ((g('ornament-visible') as HTMLInputElement)?.checked) {
+    allLayers.push({ id: 'ornament', z: editorState.positions['ornament']?.z ?? 8 });
+  }
+  // All module-order items
+  for (const key of editorState.moduleOrder) {
+    if (editorState.hiddenModules.includes(key)) continue;
+    const elId = key === 'datebadge' ? 'datebadge' : key;
+    const z = editorState.positions[elId]?.z ?? 6;
+    allLayers.push({ id: key, z });
+  }
+
+  // Sort: lowest z drawn first (furthest back), highest z drawn last (on top)
+  allLayers.sort((a, b) => a.z - b.z);
+
+  for (const layer of allLayers) {
+    const key = layer.id;
+    if (key === 'portrait') {
+      // Portrait already drawn in step 3 + fade in step 4 — skip, already rendered below all layers
+      continue;
+    } else if (key === 'cutout') {
+      await drawCutoutLayer();
+    } else if (key === 'ornament') {
+      drawOrnamentLayer();
+    } else if (key === 'datebadge') {
+      await drawDateBadge();
+    } else if (key === 'rsvp') {
+      await drawRsvpBox();
+    } else if (['divider1','divider2','divider3'].includes(key) || editorState.dynamicLayers[key]?.type === 'divider') {
+      drawDividerLayer(key);
+    } else if (['topline','intro','name','subtitle','program','greeting'].includes(key)) {
+      await drawStaticTextField(key);
+    } else if (editorState.dynamicLayers[key]?.type === 'text') {
+      await drawDynamicTextLayer(key);
+    }
+    // spacers: no visual output needed
   }
 
   // ── 12. Card border overlay ───────────────────────────────
