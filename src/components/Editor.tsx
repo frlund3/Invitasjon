@@ -77,7 +77,7 @@ const MODULE_LABELS: Record<string, string> = {
   datebadge: 'Dato-badge', divider2: '── Skillelinje 2',
   program: 'Program', divider3: '── Skillelinje 3',
   greeting: 'Hilsen', rsvp: 'RSVP',
-  portrait: 'Portrettbilde', grass: 'Gresstripe', cutout: 'Cutout-bilde',
+  portrait: 'Portrettbilde', cutout: 'Cutout-bilde',
 };
 
 export default function Editor() {
@@ -237,7 +237,6 @@ export default function Editor() {
     w.updateBadge = updateBadge;
     w.updateDividers = updateDividers;
     w.updateCardBorder = updateCardBorder;
-    w.updateGrass = updateGrass;
     w.updateOrnament = updateOrnament;
     w.updateRsvpBox = updateRsvpBox;
     w.toggleRsvpTransparent = toggleRsvpTransparent;
@@ -496,17 +495,6 @@ export default function Editor() {
             </div>
 
             <div className="sep"></div>
-            <div className="section-label">Gresstripe</div>
-            <div className="ctrl-row">
-              <label>Vis gresstripe</label>
-              <input type="checkbox" id="grass-visible" defaultChecked onChange={() => { updateGrass(); triggerSave(); }} />
-            </div>
-            <div className="ctrl-row">
-              <label>Gress-farge</label>
-              <input type="color" id="grass-color" defaultValue="#2d8a1b" onChange={() => { updateGrass(); triggerSave(); }} />
-            </div>
-
-            <div className="sep"></div>
             <div className="section-label">Ornament</div>
             <div className="ctrl-row">
               <label>Vis ornament</label>
@@ -556,7 +544,6 @@ export default function Editor() {
             <div id="el-portrait" className="card-el" data-el="portrait" style={{display:'none',width:'559px',height:'302px',backgroundSize:'cover',backgroundPosition:'center 20%',backgroundRepeat:'no-repeat'}}></div>
             <div id="el-portrait-placeholder" style={{position:'absolute',top:0,left:0,width:'100%',height:'302px',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:'13px',cursor:'pointer',background:'rgba(200,200,200,0.08)',border:'2px dashed var(--border)',zIndex:3}} onClick={() => (document.getElementById('main-upload') as HTMLInputElement)?.click()}>+ Klikk for å laste opp portrettfoto</div>
             <div id="el-portrait-fade" style={{position:'absolute',pointerEvents:'none',width:'100%',height:'120px',zIndex:4}}></div>
-            <svg id="el-grass" className="card-el" data-el="grass" viewBox="0 0 559 50" preserveAspectRatio="none" style={{width:'559px',height:'50px'}}></svg>
             <div id="el-topline" className="card-el" data-el="topline" style={{textAlign:'center',width:'519px'}}></div>
             <div id="el-divider1" className="card-el" data-el="divider1" style={{width:'479px',height:'1px',background:'#c8a068'}}></div>
             <div id="el-intro" className="card-el" data-el="intro" style={{textAlign:'center',width:'519px'}}></div>
@@ -738,7 +725,6 @@ const editorState = {
   selectedElement: null as string | null,
   positions: {
     portrait:  { x: 0,   y: 0,   z: 3  },
-    grass:     { x: 0,   y: 282, z: 5  },
     topline:   { x: 0,   y: 312, z: 6  },
     divider1:  { x: 40,  y: 336, z: 6  },
     intro:     { x: 0,   y: 350, z: 6  },
@@ -986,8 +972,6 @@ function updateMainHeight() {
   if (placeholder) (placeholder as HTMLElement).style.height = h + 'px';
   const fade = document.getElementById('el-portrait-fade');
   if (fade) fade.style.top = (h - 120) + 'px';
-  editorState.positions.grass.y = h - 20;
-  applyPosition('grass');
   updateMainZoom();
   updateMainPos();
 }
@@ -1329,42 +1313,6 @@ function updateCardBorder() {
   }
 }
 
-function generateGrass(baseColor: string) {
-  const svg = document.getElementById('el-grass');
-  if (!svg) return;
-  const r = parseInt(baseColor.slice(1, 3), 16);
-  const gr = parseInt(baseColor.slice(3, 5), 16);
-  const b = parseInt(baseColor.slice(5, 7), 16);
-  let html = `<rect width="559" height="50" fill="rgb(${Math.max(0, r - 40)},${Math.max(0, gr - 40)},${Math.max(0, b - 40)})"/>`;
-  for (let i = 0; i < 180; i++) {
-    const x = (i / 180) * 559 + (Math.random() - 0.5) * 6;
-    const h = 15 + Math.random() * 26;
-    const w = 2 + Math.random() * 3;
-    const rot = (Math.random() - 0.5) * 20;
-    const brightness = 0.85 + Math.random() * 0.3;
-    const c2 = `rgb(${Math.min(255, Math.round(r * brightness))},${Math.min(255, Math.round(gr * brightness))},${Math.min(255, Math.round(b * brightness))})`;
-    html += `<g transform="translate(${x.toFixed(1)},50) rotate(${rot.toFixed(1)})"><polygon points="-${(w / 2).toFixed(1)},0 ${(w / 2).toFixed(1)},0 ${(w / 4).toFixed(1)},-${h.toFixed(1)} -${(w / 4).toFixed(1)},-${h.toFixed(1)}" fill="${c2}"/></g>`;
-  }
-  for (let i = 0; i < 80; i++) {
-    const x = (i / 80) * 559 + (Math.random() - 0.5) * 8;
-    const h = 10 + Math.random() * 15;
-    const w = 2.5 + Math.random() * 2;
-    const rot = (Math.random() - 0.5) * 15;
-    const darkness = 0.6 + Math.random() * 0.2;
-    const c2 = `rgb(${Math.min(255, Math.round(r * darkness))},${Math.min(255, Math.round(gr * darkness))},${Math.min(255, Math.round(b * darkness))})`;
-    html += `<g transform="translate(${x.toFixed(1)},50) rotate(${rot.toFixed(1)})"><polygon points="-${(w / 2).toFixed(1)},0 ${(w / 2).toFixed(1)},0 0,-${h.toFixed(1)}" fill="${c2}"/></g>`;
-  }
-  svg.innerHTML = html;
-}
-
-function updateGrass() {
-  const visible = (g('grass-visible') as HTMLInputElement)?.checked;
-  const color = g('grass-color')?.value || '#2d8a1b';
-  const layer = document.getElementById('el-grass');
-  if (layer) layer.style.display = visible ? 'block' : 'none';
-  if (visible) generateGrass(color);
-}
-
 function updateOrnament() {
   const visible = (g('ornament-visible') as HTMLInputElement)?.checked;
   const color = g('ornament-color')?.value || '#c8a068';
@@ -1418,8 +1366,6 @@ function applyTemplate(name: string) {
   g('badge-bg').value = t.badgeBg;
   g('divider-color').value = t.dividerColor;
   g('border-color').value = t.borderColor;
-  g('grass-color').value = t.grassColor;
-  generateGrass(t.grassColor);
   if (g('rsvp-bg')) g('rsvp-bg').value = t.rsvpBg;
   if (g('rsvp-border-color')) g('rsvp-border-color').value = t.rsvpBorderColor;
 
@@ -1555,7 +1501,7 @@ function selectCardElement(id: string) {
     }
   } else if (id === 'portrait' || id === 'cutout') {
     switchTab('bilder');
-  } else if (id === 'grass' || id.startsWith('divider')) {
+  } else if (id.startsWith('divider')) {
     switchTab('design');
   }
   const readout = document.getElementById('pos-readout');
@@ -1605,13 +1551,12 @@ function attachCardDrag(id: string, triggerSave: () => void) {
 }
 
 function attachAllCardDrag(triggerSave: () => void) {
-  ['portrait','grass','topline','divider1','intro','name','subtitle','datebadge','divider2','program','divider3','greeting','rsvp','cutout'].forEach(id => attachCardDrag(id, triggerSave));
+  ['portrait','topline','divider1','intro','name','subtitle','datebadge','divider2','program','divider3','greeting','rsvp','cutout'].forEach(id => attachCardDrag(id, triggerSave));
 }
 
 function resetLayout() {
   editorState.positions = {
     portrait:  { x: 0,   y: 0,   z: 3  },
-    grass:     { x: 0,   y: 282, z: 5  },
     topline:   { x: 0,   y: 312, z: 6  },
     divider1:  { x: 40,  y: 336, z: 6  },
     intro:     { x: 0,   y: 350, z: 6  },
@@ -1683,8 +1628,6 @@ function collectState() {
       borderStyle: g('border-style')?.value,
       borderColor: g('border-color')?.value,
       borderWidth: g('border-width')?.value,
-      grassVisible: (g('grass-visible') as HTMLInputElement)?.checked,
-      grassColor: g('grass-color')?.value,
       ornamentVisible: (g('ornament-visible') as HTMLInputElement)?.checked,
       ornamentColor: g('ornament-color')?.value,
       rsvpBg: g('rsvp-bg')?.value,
@@ -1803,9 +1746,6 @@ function applyProjectData(data: Record<string, unknown>) {
     if (c.borderStyle) g('border-style').value = c.borderStyle as string;
     if (c.borderColor) g('border-color').value = c.borderColor as string;
     if (c.borderWidth) { g('border-width').value = c.borderWidth as string; const bwv = document.getElementById('border-width-v'); if (bwv) bwv.textContent = c.borderWidth + 'px'; }
-    const gv = g('grass-visible') as HTMLInputElement;
-    if (gv) gv.checked = c.grassVisible !== false;
-    if (c.grassColor) g('grass-color').value = c.grassColor as string;
     const ov = g('ornament-visible') as HTMLInputElement;
     if (ov) ov.checked = !!c.ornamentVisible;
     if (c.ornamentColor) g('ornament-color').value = c.ornamentColor as string;
@@ -1822,7 +1762,6 @@ function applyProjectData(data: Record<string, unknown>) {
     if (rtBtn) rtBtn.classList.toggle('active', editorState.rsvpTransparent);
     updateFade();
     updateCardBorder();
-    updateGrass();
     updateOrnament();
   }
 
@@ -2004,34 +1943,7 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
     ctx.fillRect(0, fadeTop, W, 120);
   }
 
-  // ── 5. Grass SVG ─────────────────────────────────────────
-  const grassVisible = (g('grass-visible') as HTMLInputElement)?.checked !== false;
-  if (grassVisible) {
-    const grassEl = document.getElementById('el-grass');
-    if (grassEl && grassEl.style.display !== 'none') {
-      try {
-        const serializer = new XMLSerializer();
-        const svgData = serializer.serializeToString(grassEl);
-        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(svgBlob);
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            const gp = editorState.positions.grass || { x: 0, y: 282 };
-            ctx.drawImage(img, gp.x, gp.y, 559, 50);
-            URL.revokeObjectURL(url);
-            resolve();
-          };
-          img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
-          img.src = url;
-        });
-      } catch (_e) {
-        // ignore grass render failure
-      }
-    }
-  }
-
-  // ── 6 & 7. Text fields and dividers ──────────────────────
+  // ── 5 & 6. Text fields and dividers ──────────────────────
   // Helper to preload a Google Font by trying to measure with it
   async function ensureFont(family: string, weight: string, style: string) {
     try {
