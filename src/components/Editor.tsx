@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 import { useAutosave } from '../hooks/useAutosave';
 import SaveStatusBar from './SaveStatusBar';
 
-declare const html2canvas: (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement>;
 declare const window: Window & {
   jspdf: { jsPDF: new (opts: object) => {
     addImage: (img: string, type: string, x: number, y: number, w: number, h: number) => void;
@@ -1868,48 +1867,447 @@ function loadProject() {
   }
 }
 
-// Export helpers — deep-clone the card, place it offscreen at 1:1, capture it
-async function captureCard(): Promise<HTMLCanvasElement> {
-  document.querySelectorAll('.card-el.selected').forEach(e => e.classList.remove('selected'));
+// ============================================================
+// CANVAS 2D RENDERER — pixel-perfect export
+// ============================================================
 
-  const card = document.getElementById('invite-card') as HTMLElement;
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
 
-  // Deep clone the card
-  const clone = card.cloneNode(true) as HTMLElement;
-
-  // Style the clone: full size, offscreen, no transform
-  clone.style.position = 'fixed';
-  clone.style.top = '-9999px';
-  clone.style.left = '-9999px';
-  clone.style.width = '559px';
-  clone.style.height = '794px';
-  clone.style.transform = 'none';
-  clone.style.overflow = 'hidden';
-
-  // Remove placeholder and any selection outlines from clone
-  const ph = clone.querySelector('#el-portrait-placeholder') as HTMLElement | null;
-  if (ph) ph.style.display = 'none';
-  clone.querySelectorAll('.selected').forEach(e => e.classList.remove('selected'));
-  clone.querySelectorAll('input[type="file"]').forEach(e => (e as HTMLElement).style.display = 'none');
-
-  document.body.appendChild(clone);
-  await new Promise(r => setTimeout(r, 80));
-
-  const canvas = await html2canvas(clone, {
-    scale: 2, useCORS: true, allowTaint: true,
-    backgroundColor: null,
-    width: 559, height: 794,
-    x: 0, y: 0,
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
   });
+}
 
-  document.body.removeChild(clone);
+async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
+  const W = 559, H = 794;
+  const SCALE = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(SCALE, SCALE);
+
+  await document.fonts.ready;
+
+  // ── 1. Background color ─────────────────────────────────
+  const bgColor = g('card-bg-color')?.value || '#fdf6ec';
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── 2. Background image ─────────────────────────────────
+  if (editorState.bgImage) {
+    try {
+      const bgImg = await loadImg(editorState.bgImage);
+      const opacity = parseInt(g('bg-opacity')?.value || '60') / 100;
+      const bgPosition = g('bg-position')?.value || 'center';
+      const bgSize = g('bg-size')?.value || 'cover';
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+
+      const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+
+      let sw = W, sh = H, sx = 0, sy = 0;
+
+      if (bgSize === 'cover') {
+        const scale = Math.max(W / iw, H / ih);
+        sw = iw * scale; sh = ih * scale;
+      } else if (bgSize === 'contain') {
+        const scale = Math.min(W / iw, H / ih);
+        sw = iw * scale; sh = ih * scale;
+      } else if (bgSize === '100% 100%') {
+        sw = W; sh = H;
+      } else {
+        // auto — natural size
+        sw = iw; sh = ih;
+      }
+
+      // Horizontal alignment
+      if (bgPosition.includes('left')) sx = 0;
+      else if (bgPosition.includes('right')) sx = W - sw;
+      else sx = (W - sw) / 2; // center
+
+      // Vertical alignment
+      if (bgPosition.includes('top')) sy = 0;
+      else if (bgPosition.includes('bottom')) sy = H - sh;
+      else sy = (H - sh) / 2; // center
+
+      ctx.drawImage(bgImg, sx, sy, sw, sh);
+      ctx.restore();
+    } catch (_e) {
+      // ignore bg image load failure
+    }
+  }
+
+  // ── 3. Portrait image ────────────────────────────────────
+  const portraitPos = editorState.positions.portrait || { x: 0, y: 0 };
+  const portraitHeight = parseInt(g('main-height')?.value || '302');
+  const portraitZoom = parseInt(g('main-zoom')?.value || '100');
+  const portraitPosY = parseInt(g('main-pos')?.value || '20');
+
+  if (editorState.mainImage) {
+    try {
+      const portImg = await loadImg(editorState.mainImage);
+      const iw = portImg.naturalWidth, ih = portImg.naturalHeight;
+      const tw = W, th = portraitHeight;
+      const scale = Math.max(tw / iw, th / ih) * (portraitZoom / 100);
+      const scaledW = iw * scale, scaledH = ih * scale;
+      const imgX = portraitPos.x + (tw - scaledW) / 2;
+      const posYFrac = portraitPosY / 100;
+      const imgY = portraitPos.y + (th - scaledH) * posYFrac;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(portraitPos.x, portraitPos.y, W - portraitPos.x, th);
+      ctx.clip();
+      ctx.drawImage(portImg, imgX, imgY, scaledW, scaledH);
+      ctx.restore();
+    } catch (_e) {
+      // ignore portrait load failure
+    }
+  }
+
+  // ── 4. Portrait fade gradient ────────────────────────────
+  const fadeColor = g('fade-color')?.value || bgColor;
+  const fadeStyle = g('fade-style')?.value || 'soft';
+
+  if (fadeStyle !== 'none') {
+    const fadeTop = portraitPos.y + portraitHeight - 120;
+    const fadeBottom = portraitPos.y + portraitHeight;
+    const grad = ctx.createLinearGradient(0, fadeTop, 0, fadeBottom);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    const stopPct = fadeStyle === 'hard' ? 0.6 : 0.9;
+    // parse fadeColor hex to rgba
+    const fr = parseInt(fadeColor.slice(1, 3), 16);
+    const fg = parseInt(fadeColor.slice(3, 5), 16);
+    const fb = parseInt(fadeColor.slice(5, 7), 16);
+    grad.addColorStop(stopPct, `rgba(${fr},${fg},${fb},0)`);
+    grad.addColorStop(1, `rgba(${fr},${fg},${fb},1)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, fadeTop, W, 120);
+  }
+
+  // ── 5. Grass SVG ─────────────────────────────────────────
+  const grassVisible = (g('grass-visible') as HTMLInputElement)?.checked !== false;
+  if (grassVisible) {
+    const grassEl = document.getElementById('el-grass');
+    if (grassEl && grassEl.style.display !== 'none') {
+      try {
+        const serializer = new XMLSerializer();
+        const svgData = serializer.serializeToString(grassEl);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const gp = editorState.positions.grass || { x: 0, y: 282 };
+            ctx.drawImage(img, gp.x, gp.y, 559, 50);
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+          img.src = url;
+        });
+      } catch (_e) {
+        // ignore grass render failure
+      }
+    }
+  }
+
+  // ── 6 & 7. Text fields and dividers ──────────────────────
+  // Helper to preload a Google Font by trying to measure with it
+  async function ensureFont(family: string, weight: string, style: string) {
+    try {
+      await document.fonts.load(`${style} ${weight} 16px '${family}'`);
+    } catch (_e) { /* ignore */ }
+  }
+
+  // Draw divider line
+  function drawDivider(divKey: string) {
+    const pos = editorState.positions[divKey] || { x: 40, y: 336 };
+    const divColor = g('divider-color')?.value || '#ccc';
+    const divW = parseFloat(g('divider-width')?.value || '1');
+    if (divW <= 0) return;
+    ctx.save();
+    ctx.strokeStyle = divColor;
+    ctx.lineWidth = divW;
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x + 479, pos.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw a text field
+  async function drawTextField(key: string) {
+    const elId = (key === 'date') ? 'datebadge' : key;
+    const pos = editorState.positions[elId] || { x: 0, y: 312 };
+    const font = g('fn-' + key)?.value || 'Lato';
+    const size = parseInt(g('fs-' + key)?.value || '14');
+    const color = g('fc-' + key)?.value || '#333333';
+    const bold = editorState.fields[key]?.bold ?? false;
+    const italic = editorState.fields[key]?.italic ?? false;
+    const spacing = parseFloat(g('fls-' + key)?.value || '0');
+    const lhRaw = parseInt(g('flh-' + key)?.value || '16');
+    const lh = (lhRaw / 10) * size;
+
+    const textEl = g('in-' + key) as HTMLTextAreaElement | HTMLInputElement;
+    const rawText = textEl ? (textEl.value || '') : '';
+
+    const fw = bold ? '700' : '400';
+    const fi = italic ? 'italic' : 'normal';
+
+    await ensureFont(font, fw, fi);
+
+    ctx.save();
+    ctx.font = `${fi} ${fw} ${size}px '${font}', serif`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = spacing + 'px';
+
+    if (key === 'date') {
+      // Date badge — drawn separately in step 8
+      ctx.restore();
+      return;
+    }
+
+    if (key === 'topline') {
+      const elWidth = 519;
+      const centerX = pos.x + elWidth / 2;
+      ctx.textAlign = 'center';
+      ctx.fillText(rawText.toUpperCase(), centerX, pos.y);
+    } else if (key === 'program' || key === 'rsvp') {
+      // multiline
+      const elWidth = 479;
+      const centerX = pos.x + elWidth / 2;
+      ctx.textAlign = 'center';
+      const lines = rawText.split('\n');
+      lines.forEach((line, i) => {
+        ctx.fillText(line, centerX, pos.y + i * lh);
+      });
+    } else {
+      // single-line centered
+      const elWidth = 519;
+      const centerX = pos.x + elWidth / 2;
+      ctx.textAlign = 'center';
+      ctx.fillText(rawText, centerX, pos.y);
+    }
+
+    ctx.restore();
+  }
+
+  // Draw dividers
+  drawDivider('divider1');
+  drawDivider('divider2');
+  drawDivider('divider3');
+
+  // Draw text fields (all except 'date' which is handled as badge)
+  for (const key of ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp']) {
+    await drawTextField(key);
+  }
+
+  // ── 8. Date badge ─────────────────────────────────────────
+  {
+    const badgePos = editorState.positions.datebadge || { x: 80, y: 440 };
+    const badgeBg = g('badge-bg')?.value || '#8b5a2b';
+    const badgeRadius = parseInt(g('badge-radius')?.value || '20');
+    const font = g('fn-date')?.value || 'Lato';
+    const size = parseInt(g('fs-date')?.value || '13');
+    const color = g('fc-date')?.value || '#ffffff';
+    const bold = editorState.fields['date']?.bold ?? false;
+    const italic = editorState.fields['date']?.italic ?? false;
+    const spacing = parseFloat(g('fls-date')?.value || '0');
+    const fw = bold ? '700' : '400';
+    const fi = italic ? 'italic' : 'normal';
+    const dateEl = g('in-date');
+    const dateText = dateEl ? dateEl.value || '' : '';
+    const paddingX = 22, paddingY = 6;
+
+    await ensureFont(font, fw, fi);
+
+    ctx.save();
+    ctx.font = `${fi} ${fw} ${size}px '${font}', sans-serif`;
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = spacing + 'px';
+    const metrics = ctx.measureText(dateText);
+    const textW = metrics.width;
+    const boxW = textW + paddingX * 2;
+    const boxH = size + paddingY * 2;
+
+    roundRect(ctx, badgePos.x, badgePos.y, boxW, boxH, badgeRadius);
+    ctx.fillStyle = badgeBg;
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(dateText, badgePos.x + boxW / 2, badgePos.y + paddingY);
+    ctx.restore();
+  }
+
+  // ── 9. RSVP box (background + border) ───────────────────
+  {
+    const rsvpVisible = (g('rsvp-visible') as HTMLInputElement)?.checked !== false;
+    if (rsvpVisible) {
+      const rsvpPos = editorState.positions.rsvp || { x: 40, y: 604 };
+      const rsvpBg = editorState.rsvpTransparent ? null : (g('rsvp-bg')?.value || '#f0e8d8');
+      const rsvpBorderColor = g('rsvp-border-color')?.value || '#c8a068';
+      const rsvpBorderW = parseFloat(g('rsvp-border-w')?.value || '1');
+      const rsvpBorderStyleVal = g('rsvp-border-style')?.value || 'solid';
+      const rsvpRadius = parseInt(g('rsvp-radius')?.value || '8');
+      const rsvpPadding = parseInt(g('rsvp-padding')?.value || '12');
+
+      // Measure RSVP text height to determine box size
+      const font = g('fn-rsvp')?.value || 'Lato';
+      const size = parseInt(g('fs-rsvp')?.value || '11');
+      const bold = editorState.fields['rsvp']?.bold ?? false;
+      const italic = editorState.fields['rsvp']?.italic ?? false;
+      const fw = bold ? '700' : '400';
+      const fi = italic ? 'italic' : 'normal';
+      const lhRaw = parseInt(g('flh-rsvp')?.value || '16');
+      const lh = (lhRaw / 10) * size;
+
+      const rsvpTextEl = g('in-rsvp') as HTMLTextAreaElement;
+      const rsvpText = rsvpTextEl ? rsvpTextEl.value || '' : '';
+      const rsvpLines = rsvpText.split('\n');
+      const textH = rsvpLines.length * lh;
+
+      const boxW = 479;
+      const boxH = textH + rsvpPadding * 2;
+
+      ctx.save();
+      roundRect(ctx, rsvpPos.x, rsvpPos.y, boxW, boxH, rsvpRadius);
+      if (rsvpBg) {
+        ctx.fillStyle = rsvpBg;
+        ctx.fill();
+      }
+      if (rsvpBorderW > 0 && rsvpBorderStyleVal !== 'none') {
+        ctx.strokeStyle = rsvpBorderColor;
+        ctx.lineWidth = rsvpBorderW;
+        if (rsvpBorderStyleVal === 'dashed') ctx.setLineDash([8, 4]);
+        else if (rsvpBorderStyleVal === 'dotted') ctx.setLineDash([2, 4]);
+        else ctx.setLineDash([]);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Draw RSVP text on top of box
+      await ensureFont(font, fw, fi);
+      ctx.save();
+      ctx.font = `${fi} ${fw} ${size}px '${font}', serif`;
+      ctx.fillStyle = g('fc-rsvp')?.value || '#333333';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const centerX = rsvpPos.x + boxW / 2;
+      rsvpLines.forEach((line, i) => {
+        ctx.fillText(line, centerX, rsvpPos.y + rsvpPadding + i * lh);
+      });
+      ctx.restore();
+    }
+  }
+
+  // ── 10. Cutout image ──────────────────────────────────────
+  if (editorState.cutoutImage) {
+    try {
+      const cutoutImg = await loadImg(editorState.cutoutImage);
+      const cutoutSize = parseInt(g('cutout-size')?.value || '220');
+      const cutoutRight = parseInt(g('cutout-right')?.value || '-10');
+      const cutoutBottom = parseInt(g('cutout-bottom')?.value || '30');
+
+      // In the DOM, cutout uses right/bottom. Convert to left/top for canvas:
+      const aspectRatio = cutoutImg.naturalHeight / cutoutImg.naturalWidth;
+      const drawW = cutoutSize;
+      const drawH = cutoutSize * aspectRatio;
+      const drawX = W - cutoutSize - cutoutRight;
+      const drawY = H - drawH - cutoutBottom;
+
+      ctx.drawImage(cutoutImg, drawX, drawY, drawW, drawH);
+    } catch (_e) {
+      // ignore cutout load failure
+    }
+  }
+
+  // ── 11. Card border overlay ───────────────────────────────
+  {
+    const borderStyle = g('border-style')?.value || 'none';
+    const borderColor = g('border-color')?.value || '#c8a068';
+    const borderWidth = parseFloat(g('border-width')?.value || '3');
+
+    if (borderStyle === 'solid') {
+      ctx.save();
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = borderWidth;
+      ctx.strokeRect(borderWidth / 2, borderWidth / 2, W - borderWidth, H - borderWidth);
+      ctx.restore();
+    } else if (borderStyle === 'double') {
+      ctx.save();
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = borderWidth;
+      ctx.strokeRect(borderWidth / 2, borderWidth / 2, W - borderWidth, H - borderWidth);
+      ctx.lineWidth = 1;
+      const gap = borderWidth + 3;
+      ctx.strokeRect(gap, gap, W - gap * 2, H - gap * 2);
+      ctx.restore();
+    } else if (borderStyle === 'ornament') {
+      ctx.save();
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = borderWidth;
+      // Outer rect
+      ctx.strokeRect(8, 8, W - 16, H - 16);
+      // Inner rect (thinner, 50% opacity)
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(14, 14, W - 28, H - 28);
+      ctx.globalAlpha = 1;
+
+      // Corner triangles
+      ctx.fillStyle = borderColor;
+      ctx.globalAlpha = 0.8;
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(8, 8); ctx.lineTo(28, 8); ctx.lineTo(8, 28); ctx.closePath(); ctx.fill();
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(W - 8, 8); ctx.lineTo(W - 28, 8); ctx.lineTo(W - 8, 28); ctx.closePath(); ctx.fill();
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(8, H - 8); ctx.lineTo(28, H - 8); ctx.lineTo(8, H - 28); ctx.closePath(); ctx.fill();
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(W - 8, H - 8); ctx.lineTo(W - 28, H - 8); ctx.lineTo(W - 8, H - 28); ctx.closePath(); ctx.fill();
+
+      // Side accent lines (30% opacity)
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = borderColor;
+      ctx.beginPath(); ctx.moveTo(8, 50); ctx.lineTo(8, H - 50); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(W - 8, 50); ctx.lineTo(W - 8, H - 50); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(50, 8); ctx.lineTo(W - 50, 8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(50, H - 8); ctx.lineTo(W - 50, H - 8); ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
   return canvas;
 }
 
 async function downloadPNG() {
   showToast('Genererer PNG...');
   try {
-    const canvas = await captureCard();
+    const canvas = await renderCardToCanvas();
     const link = document.createElement('a');
     link.download = 'invitasjon.png';
     link.href = canvas.toDataURL('image/png');
@@ -1923,7 +2321,7 @@ async function downloadPNG() {
 async function downloadPDF() {
   showToast('Genererer PDF...');
   try {
-    const canvas = await captureCard();
+    const canvas = await renderCardToCanvas();
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
