@@ -184,12 +184,18 @@ export default function Editor() {
   }, []);
 
   async function loadFromSupabase() {
+    const urlProject = new URLSearchParams(window.location.search).get('p');
+    const id = urlProject || 'default';
     const { data } = await supabase
       .from('invitation_state')
       .select('state')
-      .eq('id', 'default')
+      .eq('id', id)
       .single();
-    if (data?.state) applyProjectData(data.state);
+    if (data?.state) {
+      applyProjectData(data.state);
+      setCurrentProjectId(id);
+      setProjectNameInput(id === 'default' ? '' : id);
+    }
     setSaveEnabled(true);
   }
 
@@ -203,6 +209,9 @@ export default function Editor() {
     });
     if (error) { showToast('Lagringsfeil: ' + error.message); return; }
     setCurrentProjectId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('p', id);
+    window.history.replaceState({}, '', url.toString());
     showToast(`Lagret som "${id}"!`);
     triggerSave();
   }
@@ -226,6 +235,9 @@ export default function Editor() {
       applyProjectData(data.state);
       setCurrentProjectId(id);
       setProjectNameInput(id === 'default' ? '' : id);
+      const url = new URL(window.location.href);
+      url.searchParams.set('p', id);
+      window.history.replaceState({}, '', url.toString());
     }
     setShowProjectModal(false);
     setTimeout(() => setSaveEnabled(true), 500);
