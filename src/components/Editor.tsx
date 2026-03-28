@@ -148,6 +148,7 @@ export default function Editor() {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [savedProjects, setSavedProjects] = useState<{ id: string; updated_at: string }[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [recentColors, setRecentColors] = useState<string[]>([]);
   const currentProjectIdRef = useRef('default');
   currentProjectIdRef.current = currentProjectId;
 
@@ -229,6 +230,24 @@ export default function Editor() {
     setShowProjectModal(false);
     setTimeout(() => setSaveEnabled(true), 500);
     showToast(`Åpnet "${id}"!`);
+  }
+
+  async function duplicateNamedProject(id: string) {
+    const { data } = await supabase
+      .from('invitation_state')
+      .select('state')
+      .eq('id', id)
+      .single();
+    if (!data?.state) { showToast('Kunne ikke duplisere'); return; }
+    const newId = id + '-kopi';
+    const { error } = await supabase.from('invitation_state').upsert({
+      id: newId,
+      state: data.state,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) { showToast('Feil: ' + error.message); return; }
+    setSavedProjects(prev => [...prev, { id: newId, updated_at: new Date().toISOString() }]);
+    showToast(`Duplisert som "${newId}"!`);
   }
 
   async function deleteNamedProject(id: string) {
@@ -350,6 +369,21 @@ export default function Editor() {
 
     const w2 = window as unknown as Record<string, unknown>;
     w2.resetLayout = resetLayout;
+    w2.trackColor = trackColor;
+
+    document.addEventListener('change', (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (target.type === 'color') {
+        trackColor(target.value);
+      }
+    });
+  }
+
+  function trackColor(color: string) {
+    setRecentColors(prev => {
+      const filtered = prev.filter(c => c !== color);
+      return [color, ...filtered].slice(0, 8);
+    });
   }
 
   // Editor state (module-level for vanilla JS functions)
@@ -401,7 +435,7 @@ export default function Editor() {
               <label>Last opp bilde</label>
               <input type="file" id="main-upload" accept="image/*" onChange={(e) => { loadMainImage(e.nativeEvent as unknown as Event); triggerSave(); }} style={{width:'100%',fontSize:'11px',color:'var(--text-muted)'}} />
               <img id="main-thumb" className="img-preview empty" alt="portrett" />
-              <button className="btn btn-danger btn-sm" onClick={() => { removeMainImage(); triggerSave(); }} style={{marginTop:'4px'}}>Fjern bilde</button>
+              <button id="main-remove-btn" className="btn btn-danger btn-sm" onClick={() => { removeMainImage(); triggerSave(); }} style={{marginTop:'4px',display:'none'}}>Fjern bilde</button>
             </div>
             <div className="ctrl-row">
               <label>Fotohøyde</label>
@@ -454,7 +488,7 @@ export default function Editor() {
               <label>Last opp cutout</label>
               <input type="file" id="cutout-upload" accept="image/*" onChange={(e) => { loadCutoutImage(e.nativeEvent as unknown as Event); triggerSave(); }} style={{width:'100%',fontSize:'11px',color:'var(--text-muted)'}} />
               <img id="cutout-thumb" className="img-preview empty" alt="cutout" />
-              <button className="btn btn-danger btn-sm" onClick={() => { removeCutoutImage(); triggerSave(); }} style={{marginTop:'4px'}}>Fjern bilde</button>
+              <button id="cutout-remove-btn" className="btn btn-danger btn-sm" onClick={() => { removeCutoutImage(); triggerSave(); }} style={{marginTop:'4px',display:'none'}}>Fjern bilde</button>
             </div>
             <div className="ctrl-row">
               <label>Størrelse</label>
@@ -516,7 +550,7 @@ export default function Editor() {
               <label>Last opp bakgrunn</label>
               <input type="file" id="bg-upload" accept="image/*" onChange={(e) => { loadBgImage(e.nativeEvent as unknown as Event); triggerSave(); }} style={{width:'100%',fontSize:'11px',color:'var(--text-muted)'}} />
               <img id="bg-thumb" className="img-preview empty" alt="bakgrunn" />
-              <button className="btn btn-danger btn-sm" onClick={() => { removeBgImage(); triggerSave(); }} style={{marginTop:'4px'}}>Fjern bilde</button>
+              <button id="bg-remove-btn" className="btn btn-danger btn-sm" onClick={() => { removeBgImage(); triggerSave(); }} style={{marginTop:'4px',display:'none'}}>Fjern bilde</button>
             </div>
             <div className="ctrl-row">
               <label>Opacity</label>
@@ -638,7 +672,15 @@ export default function Editor() {
 
           {/* DESIGN TAB */}
           <div className="tab-panel" id="panel-design">
-
+            <RecentColors colors={recentColors} onPick={(c) => {
+              const focused = document.activeElement as HTMLInputElement;
+              if (focused && focused.type === 'color') {
+                focused.value = c;
+                focused.dispatchEvent(new Event('change', { bubbles: true }));
+              } else {
+                navigator.clipboard?.writeText(c).then(() => showToast('Fargen ' + c + ' kopiert!')).catch(() => showToast(c));
+              }
+            }} />
             <div style={{padding:'8px 14px'}}>
               <button className="btn btn-secondary btn-full" style={{fontSize:'11px'}} onClick={() => { resetLayout(); triggerSave(); }}>
                 ↺ Tilbakestill standard layout
@@ -794,7 +836,13 @@ export default function Editor() {
 
       {/* CANVAS AREA */}
       <div id="canvas-area">
-        <button onClick={() => { zoomOverride = null; scaleCard(); }} style={{position:'absolute',top:'8px',right:'8px',zIndex:20,background:'rgba(0,0,0,0.5)',border:'1px solid var(--border)',color:'var(--text-muted)',borderRadius:'4px',padding:'4px 8px',fontSize:'10px',cursor:'pointer',letterSpacing:'0.5px'}}>⊟ TILPASS</button>
+        <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',zIndex:20,display:'flex',alignItems:'center',gap:'6px',background:'rgba(10,10,20,0.85)',border:'1px solid var(--border)',borderRadius:'20px',padding:'5px 12px',backdropFilter:'blur(4px)'}}>
+          <button onClick={() => { zoomOverride = Math.max(0.2, (zoomOverride ?? currentCardScale) - 0.1); scaleCard(); }} style={{background:'none',border:'none',color:'var(--text-primary)',cursor:'pointer',fontSize:'16px',lineHeight:1,padding:'0 2px',opacity:0.8}} title="Zoom ut">−</button>
+          <span id="zoom-label" style={{fontSize:'11px',color:'var(--text-muted)',minWidth:'38px',textAlign:'center',letterSpacing:'0.5px'}}>100%</span>
+          <button onClick={() => { zoomOverride = Math.min(2.5, (zoomOverride ?? currentCardScale) + 0.1); scaleCard(); }} style={{background:'none',border:'none',color:'var(--text-primary)',cursor:'pointer',fontSize:'16px',lineHeight:1,padding:'0 2px',opacity:0.8}} title="Zoom inn">+</button>
+          <div style={{width:'1px',height:'14px',background:'var(--border)',margin:'0 2px'}}></div>
+          <button onClick={() => { zoomOverride = null; scaleCard(); }} style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:'10px',letterSpacing:'0.5px',padding:'0 2px'}} title="Tilpass">⊟ FIT</button>
+        </div>
         <div id="card-wrapper">
           <div id="invite-card">
             <div id="bg-img-layer"></div>
@@ -839,6 +887,7 @@ export default function Editor() {
                     <div style={{fontSize:'10px',color:'var(--text-muted)'}}>{new Date(p.updated_at).toLocaleString('no-NO')}</div>
                   </div>
                   <button className="btn btn-primary" style={{fontSize:'11px',padding:'5px 10px'}} onClick={() => openNamedProject(p.id)}>Åpne</button>
+                  <button className="btn btn-secondary" style={{fontSize:'11px',padding:'5px 10px'}} onClick={() => duplicateNamedProject(p.id)}>Duplisér</button>
                   <button className="btn btn-danger" style={{fontSize:'11px',padding:'5px 10px'}} onClick={() => deleteNamedProject(p.id)}>Slett</button>
                 </div>
               ))
@@ -1110,6 +1159,8 @@ function scaleCard() {
   currentCardScale = zoomOverride !== null ? Math.min(Math.max(zoomOverride, 0.2), 2.5) : autoScale;
   wrapper.style.transform = `scale(${currentCardScale})`;
   wrapper.style.marginTop = `-${(794 * (1 - currentCardScale)) / 2}px`;
+  const zoomLabel = document.getElementById('zoom-label');
+  if (zoomLabel) zoomLabel.textContent = Math.round(currentCardScale * 100) + '%';
 }
 
 function switchTab(name: string) {
@@ -1370,6 +1421,8 @@ async function loadMainImage(event: Event) {
   if (placeholder) placeholder.style.display = 'none';
   const thumb = document.getElementById('main-thumb') as HTMLImageElement;
   thumb.src = dataURL; thumb.classList.remove('empty');
+  const mainRemoveBtn = document.getElementById('main-remove-btn');
+  if (mainRemoveBtn) mainRemoveBtn.style.display = '';
   updateMainHeight();
 }
 
@@ -1381,6 +1434,8 @@ function removeMainImage() {
   if (placeholder) placeholder.style.display = 'flex';
   const thumb = document.getElementById('main-thumb');
   if (thumb) thumb.classList.add('empty');
+  const mainRemoveBtn = document.getElementById('main-remove-btn');
+  if (mainRemoveBtn) mainRemoveBtn.style.display = 'none';
   const upload = g('main-upload');
   if (upload) upload.value = '';
 }
@@ -1427,6 +1482,8 @@ async function loadCutoutImage(event: Event) {
   img.src = dataURL; img.style.display = 'block';
   const thumb = document.getElementById('cutout-thumb') as HTMLImageElement;
   thumb.src = dataURL; thumb.classList.remove('empty');
+  const cutoutRemoveBtn = document.getElementById('cutout-remove-btn');
+  if (cutoutRemoveBtn) cutoutRemoveBtn.style.display = '';
   updateCutout();
 }
 
@@ -1436,6 +1493,8 @@ function removeCutoutImage() {
   img.src = ''; img.style.display = 'none';
   const thumb = document.getElementById('cutout-thumb');
   if (thumb) thumb.classList.add('empty');
+  const cutoutRemoveBtn = document.getElementById('cutout-remove-btn');
+  if (cutoutRemoveBtn) cutoutRemoveBtn.style.display = 'none';
   const upload = g('cutout-upload');
   if (upload) upload.value = '';
 }
@@ -1885,13 +1944,29 @@ function updateBgShape() {
 // ============================================================
 // SNAP-TO-GRID GUIDE LINES
 // ============================================================
-function showGuideLines(snapX: number | null, snapY: number | null) {
+function showGuideLines(snapX: number | string | null, snapY: number | null) {
   const el = document.getElementById('snap-guides');
   if (!el) return;
-  let html = '';
-  if (snapX !== null) html += `<div style="position:absolute;left:${snapX}px;top:0;width:1px;height:100%;background:rgba(74,158,255,0.7);pointer-events:none;z-index:99;"></div>`;
-  if (snapY !== null) html += `<div style="position:absolute;top:${snapY}px;left:0;width:100%;height:1px;background:rgba(74,158,255,0.7);pointer-events:none;z-index:99;"></div>`;
-  el.innerHTML = html;
+  el.innerHTML = '';
+  if (snapX !== null) {
+    const isCenter = snapX === 'center';
+    const xPx = isCenter ? 279.5 : (snapX as number);
+    const line = document.createElement('div');
+    line.style.cssText = `position:absolute;left:${xPx}px;top:0;width:1px;height:100%;pointer-events:none;`;
+    if (isCenter) {
+      line.style.borderLeft = '1px dashed #ff9500';
+      line.style.background = 'transparent';
+      line.title = 'Midtstilt';
+    } else {
+      line.style.background = 'rgba(74,158,255,0.8)';
+    }
+    el.appendChild(line);
+  }
+  if (snapY !== null) {
+    const line = document.createElement('div');
+    line.style.cssText = `position:absolute;top:${snapY}px;left:0;height:1px;width:100%;background:rgba(74,158,255,0.8);pointer-events:none;`;
+    el.appendChild(line);
+  }
 }
 
 function clearGuideLines() {
@@ -2215,7 +2290,10 @@ function selectCardElement(id: string) {
   document.querySelectorAll('.card-el').forEach(e => e.classList.remove('selected'));
   document.querySelectorAll('.module-drag-item').forEach(e => e.classList.remove('layer-selected'));
   const layerRow = document.querySelector(`.module-drag-item[data-key="${id}"]`);
-  if (layerRow) layerRow.classList.add('layer-selected');
+  if (layerRow) {
+    layerRow.classList.add('layer-selected');
+    layerRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
   if (el) el.classList.add('selected');
   const FIELD_KEYS_LOCAL = ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp'];
@@ -2234,7 +2312,7 @@ function selectCardElement(id: string) {
   } else if (id.startsWith('divider')) {
     switchTab('design');
   } else if (editorState.dynamicLayers[id]) {
-    switchTab('elementer');
+    switchTab('lag');
     const dynEl = document.getElementById('dyn-ctrl-' + id);
     if (dynEl) dynEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -2277,13 +2355,23 @@ function attachCardDrag(id: string, triggerSave: () => void) {
     Object.entries(editorState.positions).forEach(([otherId, pos]) => {
       if (otherId !== id) { xSnaps.push(pos.x); ySnaps.push(pos.y); }
     });
-    let snappedX = rawX, snappedY = rawY, didSnapX = false, didSnapY = false;
-    for (const sp of xSnaps) { if (Math.abs(rawX - sp) < snapThreshold) { snappedX = sp; didSnapX = true; break; } }
+    const elWidth = editorState.moduleWidths[id] || (htmlEl.offsetWidth / currentCardScale) || 100;
+    const elCenterOffset = elWidth / 2;
+    const cardCenterX = 559 / 2;
+    const rawCenterX = rawX + elCenterOffset;
+    let snappedX = rawX, snappedY = rawY, didSnapX = false, didSnapY = false, didSnapCenter = false;
+    if (Math.abs(rawCenterX - cardCenterX) < snapThreshold) {
+      snappedX = cardCenterX - elCenterOffset;
+      didSnapX = true;
+      didSnapCenter = true;
+    } else {
+      for (const sp of xSnaps) { if (Math.abs(rawX - sp) < snapThreshold) { snappedX = sp; didSnapX = true; break; } }
+    }
     for (const sp of ySnaps) { if (Math.abs(rawY - sp) < snapThreshold) { snappedY = sp; didSnapY = true; break; } }
     editorState.positions[id].x = Math.round(snappedX);
     editorState.positions[id].y = Math.round(snappedY);
     applyPosition(id);
-    showGuideLines(didSnapX ? snappedX : null, didSnapY ? snappedY : null);
+    showGuideLines(didSnapX ? (didSnapCenter ? 'center' : snappedX) : null, didSnapY ? snappedY : null);
     const readout = document.getElementById('pos-readout');
     if (readout) readout.textContent = `${MODULE_LABELS[id] || id}: X ${Math.round(editorState.positions[id].x)} · Y ${Math.round(editorState.positions[id].y)}`;
   });
@@ -3171,6 +3259,18 @@ function EmojiPicker({ onInsert }: { onInsert: (e: string) => void }) {
     <div style={{display:'flex',flexWrap:'wrap',gap:'3px',padding:'8px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'6px',marginTop:'4px'}}>
       {EMOJI_LIST.map(e => (
         <button key={e} onClick={() => onInsert(e)} style={{fontSize:'15px',background:'none',border:'none',cursor:'pointer',padding:'3px 5px',borderRadius:'4px',lineHeight:1}} title={e}>{e}</button>
+      ))}
+    </div>
+  );
+}
+
+function RecentColors({ colors, onPick }: { colors: string[]; onPick: (c: string) => void }) {
+  if (colors.length === 0) return null;
+  return (
+    <div style={{display:'flex',flexWrap:'wrap',gap:'4px',padding:'4px 14px 2px'}}>
+      <div style={{width:'100%',fontSize:'9px',color:'var(--text-muted)',letterSpacing:'1px',textTransform:'uppercase',marginBottom:'2px'}}>Nylig brukt</div>
+      {colors.map((c, i) => (
+        <button key={i} title={c} onClick={() => onPick(c)} style={{width:'20px',height:'20px',borderRadius:'4px',background:c,border:'1px solid rgba(255,255,255,0.15)',cursor:'pointer',padding:0}} />
       ))}
     </div>
   );
