@@ -2602,6 +2602,7 @@ function applyProjectData(data: Record<string, unknown>) {
         img.src = ci.src as string; img.style.display = 'block';
         const thumb = document.getElementById('cutout-thumb') as HTMLImageElement;
         thumb.src = ci.src as string; thumb.classList.remove('empty');
+        const btn = document.getElementById('cutout-remove-btn'); if (btn) btn.style.display = '';
       }
       if (ci.width) g('cutout-size').value = ci.width as string;
       if (ci.right) g('cutout-right').value = ci.right as string;
@@ -2615,6 +2616,7 @@ function applyProjectData(data: Record<string, unknown>) {
         editorState.bgImage = bi.src as string;
         const thumb = document.getElementById('bg-thumb') as HTMLImageElement;
         thumb.src = bi.src as string; thumb.classList.remove('empty');
+        const btn = document.getElementById('bg-remove-btn'); if (btn) btn.style.display = '';
       }
       if (bi.opacity) g('bg-opacity').value = bi.opacity as string;
       if (bi.position) g('bg-position').value = bi.position as string;
