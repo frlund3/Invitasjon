@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useAutosave } from '../hooks/useAutosave';
 import SaveStatusBar from './SaveStatusBar';
 
+
+
 declare const window: Window & {
   jspdf: { jsPDF: new (opts: object) => {
     addImage: (img: string, type: string, x: number, y: number, w: number, h: number) => void;
@@ -38,14 +40,6 @@ const TEMPLATES: Record<string, {
   fonts: Record<string, string>; sizes: Record<string, number>;
   field_colors: Record<string, string>; rsvpBg: string; rsvpBorderColor: string;
 }> = {
-  stadion: {
-    bgColor: '#0d1b2a', fadeColor: '#0d1b2a', badgeBg: '#c9a432',
-    dividerColor: '#c9a432', borderColor: '#c9a432',
-    fonts: { topline: 'Oswald', intro: 'Lato', name: 'Playfair Display', subtitle: 'Lato', date: 'Oswald', program: 'Lato', greeting: 'Playfair Display', rsvp: 'Lato' },
-    sizes: { topline: 10, intro: 13, name: 36, subtitle: 13, date: 13, program: 12, greeting: 20, rsvp: 11 },
-    field_colors: { topline: '#c9a432', intro: '#a0a8c0', name: '#e8eaf8', subtitle: '#c9a432', date: '#0d1b2a', program: '#c0c8e0', greeting: '#c9a432', rsvp: '#e0e4f0' },
-    rsvpBg: '#12253a', rsvpBorderColor: '#c9a432',
-  },
   klassisk: {
     bgColor: '#faf8f4', fadeColor: '#faf8f4', badgeBg: '#1a3a6e',
     dividerColor: '#1a3a6e', borderColor: '#1a3a6e',
@@ -61,7 +55,39 @@ const TEMPLATES: Record<string, {
     sizes: { topline: 11, intro: 14, name: 38, subtitle: 15, date: 13, program: 12, greeting: 22, rsvp: 11 },
     field_colors: { topline: '#8b5a2b', intro: '#5a3a1a', name: '#2c1a0e', subtitle: '#8b5a2b', date: '#ffffff', program: '#3a2010', greeting: '#8b5a2b', rsvp: '#2c1a0e' },
     rsvpBg: '#f0e8d8', rsvpBorderColor: '#c8a068',
-  }
+  },
+  minimal: {
+    bgColor: '#ffffff', fadeColor: '#ffffff', badgeBg: '#111111',
+    dividerColor: '#cccccc', borderColor: '#111111',
+    fonts: { topline: 'Lato', intro: 'Lato', name: 'Lato', subtitle: 'Lato', date: 'Lato', program: 'Lato', greeting: 'Great Vibes', rsvp: 'Lato' },
+    sizes: { topline: 9, intro: 12, name: 42, subtitle: 11, date: 12, program: 11, greeting: 28, rsvp: 11 },
+    field_colors: { topline: '#999999', intro: '#555555', name: '#111111', subtitle: '#999999', date: '#ffffff', program: '#333333', greeting: '#111111', rsvp: '#333333' },
+    rsvpBg: '#f5f5f5', rsvpBorderColor: '#cccccc',
+  },
+  romantisk: {
+    bgColor: '#fdf0f5', fadeColor: '#fdf0f5', badgeBg: '#c0566a',
+    dividerColor: '#e8a0b0', borderColor: '#c0566a',
+    fonts: { topline: 'Cormorant Garamond', intro: 'Cormorant Garamond', name: 'Playfair Display', subtitle: 'Cormorant Garamond', date: 'Cormorant Garamond', program: 'Cormorant Garamond', greeting: 'Great Vibes', rsvp: 'Cormorant Garamond' },
+    sizes: { topline: 10, intro: 15, name: 40, subtitle: 14, date: 13, program: 13, greeting: 26, rsvp: 12 },
+    field_colors: { topline: '#c0566a', intro: '#6a3040', name: '#3a1020', subtitle: '#c0566a', date: '#ffffff', program: '#4a2030', greeting: '#c0566a', rsvp: '#3a1020' },
+    rsvpBg: '#fce8ee', rsvpBorderColor: '#e8a0b0',
+  },
+  hav: {
+    bgColor: '#e8f4f8', fadeColor: '#e8f4f8', badgeBg: '#1a6080',
+    dividerColor: '#5aabb8', borderColor: '#1a6080',
+    fonts: { topline: 'Oswald', intro: 'EB Garamond', name: 'Playfair Display', subtitle: 'EB Garamond', date: 'Oswald', program: 'EB Garamond', greeting: 'Dancing Script', rsvp: 'Lato' },
+    sizes: { topline: 10, intro: 14, name: 38, subtitle: 14, date: 12, program: 12, greeting: 24, rsvp: 11 },
+    field_colors: { topline: '#1a6080', intro: '#1a4050', name: '#0a2030', subtitle: '#1a6080', date: '#ffffff', program: '#1a3040', greeting: '#1a6080', rsvp: '#0a2030' },
+    rsvpBg: '#d0eaf0', rsvpBorderColor: '#5aabb8',
+  },
+  midnatt: {
+    bgColor: '#0f0f1a', fadeColor: '#0f0f1a', badgeBg: '#7c5cbf',
+    dividerColor: '#7c5cbf', borderColor: '#7c5cbf',
+    fonts: { topline: 'Cinzel', intro: 'Cormorant Garamond', name: 'Cinzel', subtitle: 'Cormorant Garamond', date: 'Cinzel', program: 'Cormorant Garamond', greeting: 'Great Vibes', rsvp: 'Cormorant Garamond' },
+    sizes: { topline: 10, intro: 15, name: 34, subtitle: 14, date: 12, program: 13, greeting: 26, rsvp: 12 },
+    field_colors: { topline: '#7c5cbf', intro: '#b0a0d8', name: '#e8e0f8', subtitle: '#7c5cbf', date: '#ffffff', program: '#c0b8e0', greeting: '#9c7cdf', rsvp: '#d0c8f0' },
+    rsvpBg: '#1a1a2e', rsvpBorderColor: '#7c5cbf',
+  },
 };
 
 const FIELD_KEYS = ['topline', 'intro', 'name', 'subtitle', 'date', 'program', 'greeting', 'rsvp'];
@@ -88,10 +114,12 @@ export default function Editor() {
   const [projectNameInput, setProjectNameInput] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [savedProjects, setSavedProjects] = useState<{ id: string; updated_at: string }[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const currentProjectIdRef = useRef('default');
   currentProjectIdRef.current = currentProjectId;
 
   const triggerSave = useCallback(() => {
+    pushUndo();
     setSaveVersion(v => v + 1);
   }, []);
 
@@ -249,6 +277,33 @@ export default function Editor() {
     w.downloadPDF = downloadPDF;
     w.downloadPNG = downloadPNG;
     w.triggerSave = triggerSave;
+    w.updatePortraitFilter = updatePortraitFilter;
+    w.updatePortraitFrame = updatePortraitFrame;
+    w.updateBgShape = updateBgShape;
+    w.undo = undo;
+    w.redo = redo;
+    w.pushUndo = pushUndo;
+
+    // Keyboard shortcuts for undo/redo
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    });
+
+    // Wheel zoom on canvas area
+    const canvasArea = document.getElementById('canvas-area');
+    if (canvasArea) {
+      canvasArea.addEventListener('wheel', (e: WheelEvent) => {
+        e.preventDefault();
+        const area = document.getElementById('canvas-area')!;
+        const aW = area.clientWidth - 40, aH = area.clientHeight - 40;
+        const autoScale = Math.min(aW / 559, aH / 794, 1);
+        const base = zoomOverride ?? autoScale;
+        const newZ = Math.min(Math.max(base * (e.deltaY < 0 ? 1.1 : 0.9), 0.2), 2.5);
+        zoomOverride = Math.abs(newZ - autoScale) < 0.03 ? null : newZ;
+        scaleCard();
+      }, { passive: false });
+    }
 
     // Init module order UI
     renderModuleOrderUI(triggerSave);
@@ -270,14 +325,17 @@ export default function Editor() {
           <p>Konfirmasjon 2026</p>
         </div>
 
-        <SaveStatusBar status={status} />
+        <SaveStatusBar status={status} projectId={currentProjectId} />
 
         <div id="template-section">
           <h2>Mal</h2>
           <div className="template-cards">
-            <div className="tpl-card" id="tpl-stadion" onClick={() => { applyTemplate('stadion'); triggerSave(); }}>STADION<span>Mørk/Gull</span></div>
-            <div className="tpl-card" id="tpl-klassisk" onClick={() => { applyTemplate('klassisk'); triggerSave(); }}>KLASSISK<span>Lys/Navy</span></div>
             <div className="tpl-card active" id="tpl-natur" onClick={() => { applyTemplate('natur'); triggerSave(); }}>NATUR<span>Varm/Jord</span></div>
+            <div className="tpl-card" id="tpl-klassisk" onClick={() => { applyTemplate('klassisk'); triggerSave(); }}>KLASSISK<span>Lys/Navy</span></div>
+            <div className="tpl-card" id="tpl-minimal" onClick={() => { applyTemplate('minimal'); triggerSave(); }}>MINIMAL<span>Ren/Sort</span></div>
+            <div className="tpl-card" id="tpl-romantisk" onClick={() => { applyTemplate('romantisk'); triggerSave(); }}>ROMANTISK<span>Rosa/Guld</span></div>
+            <div className="tpl-card" id="tpl-hav" onClick={() => { applyTemplate('hav'); triggerSave(); }}>HAV<span>Blå/Frisk</span></div>
+            <div className="tpl-card" id="tpl-midnatt" onClick={() => { applyTemplate('midnatt'); triggerSave(); }}>MIDNATT<span>Mørk/Lilla</span></div>
           </div>
         </div>
 
@@ -312,6 +370,34 @@ export default function Editor() {
               <label>Posisjon Y</label>
               <input type="range" id="main-pos" min="0" max="100" defaultValue="20" onInput={() => { updateMainPos(); triggerSave(); }} />
               <span className="val-display" id="main-pos-v">20%</span>
+            </div>
+
+            <div className="sep"></div>
+            <div className="section-label">Fotofilter</div>
+            <div className="ctrl-row">
+              <label>Filter</label>
+              <select id="portrait-filter-mode" onChange={() => { updatePortraitFilter(); triggerSave(); }}>
+                <option value="normal">Normal</option>
+                <option value="grayscale">Svart-hvitt</option>
+                <option value="sepia">Sepia</option>
+              </select>
+            </div>
+            <div className="ctrl-row">
+              <label>Lysstyrke <span className="val-display" id="portrait-filter-brightness-v">100%</span></label>
+              <input type="range" id="portrait-filter-brightness" min="0" max="200" defaultValue="100" onInput={() => { updatePortraitFilter(); triggerSave(); }} />
+            </div>
+            <div className="ctrl-row">
+              <label>Kontrast <span className="val-display" id="portrait-filter-contrast-v">100%</span></label>
+              <input type="range" id="portrait-filter-contrast" min="0" max="200" defaultValue="100" onInput={() => { updatePortraitFilter(); triggerSave(); }} />
+            </div>
+            <div className="ctrl-row">
+              <label>Rammeform</label>
+              <select id="portrait-frame-type" onChange={() => { updatePortraitFrame(); triggerSave(); }}>
+                <option value="none">Ingen</option>
+                <option value="round">Rund</option>
+                <option value="oval">Oval</option>
+                <option value="arch">Bue-topp</option>
+              </select>
             </div>
 
             <div className="sep"></div>
@@ -413,6 +499,30 @@ export default function Editor() {
 
           {/* TEKST TAB */}
           <div className="tab-panel" id="panel-tekst">
+            <div style={{padding:'8px 14px 4px'}}>
+              <button className="btn btn-secondary btn-full" style={{fontSize:'11px'}} onClick={() => setShowEmojiPicker(p => !p)}>
+                😊 {showEmojiPicker ? 'Lukk symbolvelger' : 'Sett inn symbol'}
+              </button>
+              {showEmojiPicker && (
+                <EmojiPicker onInsert={(emoji) => {
+                  if (!lastFocusedFieldKey) return;
+                  const el = g('in-' + lastFocusedFieldKey) as HTMLInputElement | HTMLTextAreaElement;
+                  if (!el) return;
+                  const start = el.selectionStart ?? el.value.length;
+                  const end = el.selectionEnd ?? el.value.length;
+                  el.value = el.value.slice(0, start) + emoji + el.value.slice(end);
+                  el.setSelectionRange(start + emoji.length, start + emoji.length);
+                  el.focus();
+                  syncField(lastFocusedFieldKey);
+                  triggerSave();
+                  setShowEmojiPicker(false);
+                }} />
+              )}
+            </div>
+            <div className="sep"></div>
+            <div className="section-label">Lag / rekkefølge</div>
+            <div id="module-order-list" style={{padding:'4px 8px'}}></div>
+
             {FIELD_KEYS.map(key => (
               <FieldAccordion key={key} fieldKey={key} onChange={triggerSave} />
             ))}
@@ -432,6 +542,26 @@ export default function Editor() {
             <div className="ctrl-row">
               <label>Bakgrunnsfarge</label>
               <input type="color" id="card-bg-color" defaultValue="#fdf6ec" onChange={() => { updateCardBg(); triggerSave(); }} />
+            </div>
+
+            <div className="sep"></div>
+            <div className="section-label">Bakgrunnsform</div>
+            <div className="ctrl-row">
+              <label>Form</label>
+              <select id="bg-shape-type" onChange={() => { updateBgShape(); triggerSave(); }}>
+                <option value="none">Ingen</option>
+                <option value="wave">Bølge</option>
+                <option value="diagonal">Diagonal</option>
+                <option value="geometric">Geometrisk</option>
+              </select>
+            </div>
+            <div className="ctrl-row">
+              <label>Farge</label>
+              <input type="color" id="bg-shape-color" defaultValue="#c8a068" onChange={() => { updateBgShape(); triggerSave(); }} />
+            </div>
+            <div className="ctrl-row">
+              <label>Opacity <span className="val-display" id="bg-shape-opacity-v">80%</span></label>
+              <input type="range" id="bg-shape-opacity" min="0" max="100" defaultValue="80" onInput={() => { updateBgShape(); triggerSave(); }} />
             </div>
 
             <div className="sep"></div>
@@ -501,8 +631,23 @@ export default function Editor() {
               <input type="checkbox" id="ornament-visible" onChange={() => { updateOrnament(); triggerSave(); }} />
             </div>
             <div className="ctrl-row">
+              <label>Type</label>
+              <select id="ornament-type" onChange={() => { updateOrnament(); triggerSave(); }}>
+                <option value="flower">Blomst</option>
+                <option value="lily">Lilje</option>
+                <option value="crown">Krone</option>
+                <option value="heart">Hjerte</option>
+                <option value="wreath">Løvkrans</option>
+              </select>
+            </div>
+            <div className="ctrl-row">
               <label>Ornament-farge</label>
               <input type="color" id="ornament-color" defaultValue="#c8a068" onChange={() => { updateOrnament(); triggerSave(); }} />
+            </div>
+            <div className="ctrl-row">
+              <label>Ornament-opacity</label>
+              <input type="range" id="ornament-opacity" min="0" max="100" defaultValue="80" onChange={() => { updateOrnament(); triggerSave(); }} />
+              <span id="ornament-opacity-v">80%</span>
             </div>
           </div>
 
@@ -510,6 +655,10 @@ export default function Editor() {
 
         <div id="save-section">
           <div id="pos-readout" style={{fontSize:'10px',color:'var(--accent)',minHeight:'14px',letterSpacing:'0.5px',marginBottom:'4px'}}></div>
+          <div style={{display:'flex',gap:'4px',marginBottom:'6px'}}>
+            <button className="btn btn-secondary" style={{flex:1,fontSize:'11px'}} onClick={undo}>↩ Angre</button>
+            <button className="btn btn-secondary" style={{flex:1,fontSize:'11px'}} onClick={redo}>↪ Gjenta</button>
+          </div>
           <div style={{fontSize:'10px',color:'var(--text-muted)',marginBottom:'4px',letterSpacing:'0.5px'}}>
             {currentProjectId !== 'default' ? `Prosjekt: ${currentProjectId}` : 'Prosjekt: (standard)'}
           </div>
@@ -537,10 +686,12 @@ export default function Editor() {
 
       {/* CANVAS AREA */}
       <div id="canvas-area">
+        <button onClick={() => { zoomOverride = null; scaleCard(); }} style={{position:'absolute',top:'8px',right:'8px',zIndex:20,background:'rgba(0,0,0,0.5)',border:'1px solid var(--border)',color:'var(--text-muted)',borderRadius:'4px',padding:'4px 8px',fontSize:'10px',cursor:'pointer',letterSpacing:'0.5px'}}>⊟ TILPASS</button>
         <div id="card-wrapper">
           <div id="invite-card">
             <div id="bg-img-layer"></div>
             <div id="bg-color-layer"></div>
+            <div id="bg-shape-layer" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:2}}></div>
             <div id="el-portrait" className="card-el" data-el="portrait" style={{display:'none',width:'559px',height:'302px',backgroundSize:'cover',backgroundPosition:'center 20%',backgroundRepeat:'no-repeat'}}></div>
             <div id="el-portrait-placeholder" style={{position:'absolute',top:0,left:0,width:'100%',height:'302px',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:'13px',cursor:'pointer',background:'rgba(200,200,200,0.08)',border:'2px dashed var(--border)',zIndex:3}} onClick={() => (document.getElementById('main-upload') as HTMLInputElement)?.click()}>+ Klikk for å laste opp portrettfoto</div>
             <div id="el-portrait-fade" style={{position:'absolute',pointerEvents:'none',width:'100%',height:'120px',zIndex:4}}></div>
@@ -556,8 +707,9 @@ export default function Editor() {
             <div id="el-greeting" className="card-el" data-el="greeting" style={{textAlign:'center',width:'519px'}}></div>
             <div id="el-rsvp" className="card-el" data-el="rsvp" style={{width:'479px'}}></div>
             <img id="cutout-img" className="card-el" data-el="cutout" alt="cutout" style={{display:'none',width:'220px'}} />
+            <div id="snap-guides" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:25,overflow:'hidden'}}></div>
             <div id="card-border-overlay"></div>
-            <div id="ornament"></div>
+            <div id="ornament" className="card-el" data-el="ornament"></div>
           </div>
         </div>
       </div>
@@ -622,9 +774,9 @@ function FieldAccordion({ fieldKey, onChange }: { fieldKey: string; onChange: ()
         <div className="ctrl-block">
           <label>Tekst</label>
           {isMultiline ? (
-            <textarea id={`in-${fieldKey}`} defaultValue={FIELD_DEFAULTS[fieldKey]} onInput={() => { syncField(fieldKey); onChange(); }} />
+            <textarea id={`in-${fieldKey}`} defaultValue={FIELD_DEFAULTS[fieldKey]} onFocus={() => { lastFocusedFieldKey = fieldKey; }} onInput={() => { syncField(fieldKey); onChange(); }} />
           ) : (
-            <input type="text" id={`in-${fieldKey}`} defaultValue={FIELD_DEFAULTS[fieldKey]} onInput={() => { syncField(fieldKey); onChange(); }} />
+            <input type="text" id={`in-${fieldKey}`} defaultValue={FIELD_DEFAULTS[fieldKey]} onFocus={() => { lastFocusedFieldKey = fieldKey; }} onInput={() => { syncField(fieldKey); onChange(); }} />
           )}
         </div>
         <div className="row2">
@@ -660,6 +812,37 @@ function FieldAccordion({ fieldKey, onChange }: { fieldKey: string; onChange: ()
             <button className="toggle-btn" id={`fb-${fieldKey}`} onClick={() => { toggleBold(fieldKey); onChange(); }}>B</button>
             <button className="toggle-btn italic" id={`fi-${fieldKey}`} onClick={() => { toggleItalic(fieldKey); onChange(); }}>I</button>
           </div>
+        )}
+        {fieldKey !== 'date' && (
+          <>
+            <div className="sep"></div>
+            <div className="row2">
+              <div>
+                <label>Bredde <span className="val-sm" id={`mw-${fieldKey}-v`}>{fieldKey === 'rsvp' || fieldKey === 'program' ? '479' : '519'}px</span></label>
+                <input type="range" id={`mw-${fieldKey}`} min="100" max="519" defaultValue={fieldKey === 'rsvp' || fieldKey === 'program' ? '479' : '519'} onInput={() => {
+                  const el = document.getElementById(`mw-${fieldKey}`) as HTMLInputElement;
+                  const v = document.getElementById(`mw-${fieldKey}-v`);
+                  if (v) v.textContent = el.value + 'px';
+                  editorState.moduleWidths[fieldKey] = parseInt(el.value);
+                  updateCardElement(fieldKey);
+                  onChange();
+                }} />
+              </div>
+              <div>
+                <label>Justering</label>
+                <select id={`ma-${fieldKey}`} defaultValue={fieldKey === 'rsvp' ? 'left' : 'center'} onChange={() => {
+                  const el = document.getElementById(`ma-${fieldKey}`) as HTMLSelectElement;
+                  editorState.moduleAligns[fieldKey] = el.value;
+                  updateCardElement(fieldKey);
+                  onChange();
+                }}>
+                  <option value="left">Venstre</option>
+                  <option value="center">Midtstilt</option>
+                  <option value="right">Høyre</option>
+                </select>
+              </div>
+            </div>
+          </>
         )}
         {fieldKey === 'rsvp' && (
           <>
@@ -712,6 +895,12 @@ function FieldAccordion({ fieldKey, onChange }: { fieldKey: string; onChange: ()
 // ============================================================
 // VANILLA JS EDITOR FUNCTIONS (operate on DOM directly)
 // ============================================================
+const undoStack: unknown[] = [];
+const redoStack: unknown[] = [];
+
+let lastFocusedFieldKey: string | null = null;
+let zoomOverride: number | null = null;
+
 const editorState = {
   template: 'natur',
   mainImage: null as string | null,
@@ -720,8 +909,15 @@ const editorState = {
   bgImage: null as string | null,
   bgColorForRemoval: null as string | null,
   rsvpTransparent: false,
+  portraitFilter: { mode: 'normal' as 'normal'|'grayscale'|'sepia', brightness: 100, contrast: 100 },
+  portraitFrame: 'none' as 'none'|'round'|'oval'|'arch',
+  bgShape: { type: 'none' as 'none'|'wave'|'diagonal'|'geometric', color: '#c8a068', opacity: 80 },
   fields: Object.fromEntries(FIELD_KEYS.map(k => [k, { bold: false, italic: k === 'intro' || k === 'subtitle' }])),
+  moduleWidths: { topline: 519, intro: 519, name: 519, subtitle: 519, program: 479, greeting: 519, rsvp: 479, date: 0 } as Record<string, number>,
+  moduleAligns: { topline: 'center', intro: 'center', name: 'center', subtitle: 'center', program: 'center', greeting: 'center', rsvp: 'left', date: 'center' } as Record<string, string>,
   moduleOrder: [...DEFAULT_MODULE_ORDER],
+  hiddenModules: [] as string[],
+  customLabels: {} as Record<string, string>,
   selectedElement: null as string | null,
   positions: {
     portrait:  { x: 0,   y: 0,   z: 3  },
@@ -760,10 +956,10 @@ function scaleCard() {
   if (!area || !wrapper) return;
   const aW = area.clientWidth - 40;
   const aH = area.clientHeight - 40;
-  const scale = Math.min(aW / 559, aH / 794, 1);
-  currentCardScale = scale;
+  const autoScale = Math.min(aW / 559, aH / 794, 1);
+  currentCardScale = zoomOverride !== null ? Math.min(Math.max(zoomOverride, 0.2), 2.5) : autoScale;
   wrapper.style.transform = `scale(${currentCardScale})`;
-  wrapper.style.marginTop = `-${(794 * (1 - scale)) / 2}px`;
+  wrapper.style.marginTop = `-${(794 * (1 - currentCardScale)) / 2}px`;
 }
 
 function switchTab(name: string) {
@@ -797,6 +993,11 @@ function updateCardElement(key: string) {
   const el = document.getElementById('el-' + elId);
   if (!el) return;
 
+  if (editorState.hiddenModules.includes(elId) || editorState.hiddenModules.includes(key)) {
+    el.style.display = 'none';
+    return;
+  }
+
   const font = g('fn-' + key)?.value || 'Lato';
   const size = g('fs-' + key)?.value || '14';
   const color = g('fc-' + key)?.value || '#333';
@@ -808,6 +1009,14 @@ function updateCardElement(key: string) {
   const text = getFieldText(key);
   const fw = bold ? '700' : '400';
   const fi = italic ? 'italic' : 'normal';
+
+  // Apply width and text-align from editorState
+  if (key !== 'date') {
+    const w = editorState.moduleWidths[key];
+    if (w) el.style.width = w + 'px';
+    const align = editorState.moduleAligns[key] || 'center';
+    el.style.textAlign = align;
+  }
 
   if (key === 'date') {
     const badgeBg = g('badge-bg')?.value || '#888';
@@ -859,7 +1068,15 @@ function updateDividerElements() {
   const divW = parseFloat(g('divider-width')?.value || '1');
   ['divider1','divider2','divider3'].forEach(id => {
     const el = document.getElementById('el-' + id);
-    if (el) { el.style.height = divW + 'px'; el.style.background = divColor; }
+    if (el) {
+      if (editorState.hiddenModules.includes(id)) {
+        el.style.display = 'none';
+      } else {
+        el.style.height = divW + 'px';
+        el.style.background = divColor;
+        el.style.display = '';
+      }
+    }
   });
 }
 
@@ -1316,19 +1533,65 @@ function updateCardBorder() {
 function updateOrnament() {
   const visible = (g('ornament-visible') as HTMLInputElement)?.checked;
   const color = g('ornament-color')?.value || '#c8a068';
+  const opacityInput = g('ornament-opacity') as HTMLInputElement;
+  const opacityVal = opacityInput ? parseInt(opacityInput.value) : 80;
+  const opacityV = document.getElementById('ornament-opacity-v');
+  if (opacityV) opacityV.textContent = opacityVal + '%';
   const el = document.getElementById('ornament');
   if (!el) return;
   el.style.display = visible ? 'block' : 'none';
+  el.style.opacity = (opacityVal / 100).toString();
   if (visible) {
-    el.style.bottom = '60px'; el.style.right = '20px';
     el.style.width = '60px'; el.style.height = '60px';
-    el.innerHTML = `<svg viewBox="0 0 60 60" fill="${color}" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="30" cy="30" r="28" fill="none" stroke="${color}" stroke-width="1.5"/>
-      <path d="M30 8 C20 14 10 22 10 30 C10 42 20 52 30 52 C40 52 50 42 50 30 C50 22 40 14 30 8Z" fill="${color}" opacity="0.15"/>
-      <ellipse cx="22" cy="26" rx="6" ry="9" fill="${color}" opacity="0.4" transform="rotate(-25,22,26)"/>
-      <ellipse cx="38" cy="26" rx="6" ry="9" fill="${color}" opacity="0.4" transform="rotate(25,38,26)"/>
-      <ellipse cx="30" cy="36" rx="6" ry="8" fill="${color}" opacity="0.4"/>
-    </svg>`;
+    if (!editorState.positions['ornament']) {
+      editorState.positions['ornament'] = { x: 479, y: 674, z: 8 };
+    }
+    applyPosition('ornament');
+    const type = g('ornament-type')?.value || 'flower';
+    const svgs: Record<string, string> = {
+      flower: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="${color}" stroke-width="1.5"/>
+        <path d="M30 8 C20 14 10 22 10 30 C10 42 20 52 30 52 C40 52 50 42 50 30 C50 22 40 14 30 8Z" fill="${color}" opacity="0.15"/>
+        <ellipse cx="22" cy="26" rx="6" ry="9" fill="${color}" opacity="0.4" transform="rotate(-25,22,26)"/>
+        <ellipse cx="38" cy="26" rx="6" ry="9" fill="${color}" opacity="0.4" transform="rotate(25,38,26)"/>
+        <ellipse cx="30" cy="36" rx="6" ry="8" fill="${color}" opacity="0.4"/>
+      </svg>`,
+      lily: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="${color}" stroke-width="1.5"/>
+        <path d="M30 10 C30 10 24 20 24 28 C24 34 27 38 30 40 C33 38 36 34 36 28 C36 20 30 10 30 10Z" fill="${color}" opacity="0.5"/>
+        <path d="M30 10 C30 10 18 18 14 26 C11 32 13 38 16 41 C20 38 24 34 26 28 C28 22 30 10 30 10Z" fill="${color}" opacity="0.35"/>
+        <path d="M30 10 C30 10 42 18 46 26 C49 32 47 38 44 41 C40 38 36 34 34 28 C32 22 30 10 30 10Z" fill="${color}" opacity="0.35"/>
+        <circle cx="30" cy="41" r="4" fill="${color}" opacity="0.6"/>
+        <line x1="30" y1="45" x2="30" y2="52" stroke="${color}" stroke-width="1.5" opacity="0.5"/>
+      </svg>`,
+      crown: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="${color}" stroke-width="1.5"/>
+        <path d="M10 40 L10 22 L18 32 L30 14 L42 32 L50 22 L50 40 Z" fill="${color}" opacity="0.35"/>
+        <rect x="10" y="40" width="40" height="5" rx="1" fill="${color}" opacity="0.5"/>
+        <circle cx="10" cy="22" r="2.5" fill="${color}" opacity="0.7"/>
+        <circle cx="30" cy="14" r="2.5" fill="${color}" opacity="0.7"/>
+        <circle cx="50" cy="22" r="2.5" fill="${color}" opacity="0.7"/>
+      </svg>`,
+      heart: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="${color}" stroke-width="1.5"/>
+        <path d="M30 46 C30 46 10 34 10 22 C10 15 16 10 22 12 C26 13 29 17 30 20 C31 17 34 13 38 12 C44 10 50 15 50 22 C50 34 30 46 30 46Z" fill="${color}" opacity="0.4"/>
+        <path d="M30 40 C30 40 16 31 16 22 C16 18 19 15 22 16 C25 17 28 20 30 24 C32 20 35 17 38 16 C41 15 44 18 44 22 C44 31 30 40 30 40Z" fill="${color}" opacity="0.2"/>
+      </svg>`,
+      wreath: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="${color}" stroke-width="1.5"/>
+        <circle cx="30" cy="30" r="16" fill="none" stroke="${color}" stroke-width="1" opacity="0.4"/>
+        <ellipse cx="14" cy="30" rx="5" ry="8" fill="${color}" opacity="0.35"/>
+        <ellipse cx="46" cy="30" rx="5" ry="8" fill="${color}" opacity="0.35"/>
+        <ellipse cx="30" cy="14" rx="5" ry="8" fill="${color}" opacity="0.35" transform="rotate(90,30,14)"/>
+        <ellipse cx="30" cy="46" rx="5" ry="8" fill="${color}" opacity="0.35" transform="rotate(90,30,46)"/>
+        <ellipse cx="18" cy="18" rx="4" ry="7" fill="${color}" opacity="0.25" transform="rotate(45,18,18)"/>
+        <ellipse cx="42" cy="18" rx="4" ry="7" fill="${color}" opacity="0.25" transform="rotate(-45,42,18)"/>
+        <ellipse cx="18" cy="42" rx="4" ry="7" fill="${color}" opacity="0.25" transform="rotate(-45,18,42)"/>
+        <ellipse cx="42" cy="42" rx="4" ry="7" fill="${color}" opacity="0.25" transform="rotate(45,42,42)"/>
+        <circle cx="30" cy="30" r="3" fill="${color}" opacity="0.6"/>
+      </svg>`,
+    };
+    el.innerHTML = svgs[type] || svgs.flower;
   }
 }
 
@@ -1347,6 +1610,88 @@ function toggleRsvpTransparent() {
 }
 
 function toggleRsvpBox() { updateCardElement('rsvp'); }
+
+// ============================================================
+// PORTRAIT FILTER
+// ============================================================
+function buildPortraitFilterCSS(): string {
+  const f = editorState.portraitFilter;
+  const parts: string[] = [];
+  if (f.mode === 'grayscale') parts.push('grayscale(1)');
+  if (f.mode === 'sepia') parts.push('sepia(1)');
+  if (f.brightness !== 100) parts.push(`brightness(${f.brightness / 100})`);
+  if (f.contrast !== 100) parts.push(`contrast(${f.contrast / 100})`);
+  return parts.join(' ') || 'none';
+}
+
+function updatePortraitFilter() {
+  const mode = (document.getElementById('portrait-filter-mode') as HTMLSelectElement)?.value || 'normal';
+  const brightness = parseInt(g('portrait-filter-brightness')?.value || '100');
+  const contrast = parseInt(g('portrait-filter-contrast')?.value || '100');
+  editorState.portraitFilter = { mode: mode as 'normal'|'grayscale'|'sepia', brightness, contrast };
+  const div = document.getElementById('el-portrait') as HTMLElement;
+  if (div) div.style.filter = buildPortraitFilterCSS();
+  const bv = document.getElementById('portrait-filter-brightness-v'); if (bv) bv.textContent = brightness + '%';
+  const cv = document.getElementById('portrait-filter-contrast-v'); if (cv) cv.textContent = contrast + '%';
+}
+
+// ============================================================
+// PORTRAIT FRAME
+// ============================================================
+function updatePortraitFrame() {
+  const type = (document.getElementById('portrait-frame-type') as HTMLSelectElement)?.value || 'none';
+  editorState.portraitFrame = type as 'none'|'round'|'oval'|'arch';
+  const div = document.getElementById('el-portrait') as HTMLElement;
+  if (!div) return;
+  if (type === 'none') { div.style.clipPath = ''; div.style.borderRadius = ''; }
+  else if (type === 'round') { div.style.clipPath = 'circle(46% at 50% 50%)'; div.style.borderRadius = ''; }
+  else if (type === 'oval') { div.style.clipPath = 'ellipse(47% 48% at 50% 50%)'; div.style.borderRadius = ''; }
+  else if (type === 'arch') { div.style.clipPath = ''; div.style.borderRadius = '50% 50% 0 0 / 30% 30% 0 0'; }
+}
+
+// ============================================================
+// BACKGROUND SHAPE
+// ============================================================
+function buildBgShapeSVG(): string {
+  const { type, color, opacity } = editorState.bgShape;
+  const alpha = opacity / 100;
+  if (type === 'wave') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="559" height="794"><path d="M0,640 Q140,570 279,640 Q420,710 559,640 L559,794 L0,794 Z" fill="${color}" opacity="${alpha}"/><path d="M0,680 Q140,620 279,680 Q420,740 559,680 L559,794 L0,794 Z" fill="${color}" opacity="${alpha * 0.5}"/></svg>`;
+  } else if (type === 'diagonal') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="559" height="794"><polygon points="559,0 559,794 0,794" fill="${color}" opacity="${alpha}"/></svg>`;
+  } else if (type === 'geometric') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="559" height="794"><defs><pattern id="geo" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M22 4 L40 22 L22 40 L4 22 Z" fill="none" stroke="${color}" stroke-width="1" opacity="${alpha}"/></pattern></defs><rect width="559" height="794" fill="url(#geo)"/></svg>`;
+  }
+  return '';
+}
+
+function updateBgShape() {
+  editorState.bgShape.type = (document.getElementById('bg-shape-type') as HTMLSelectElement)?.value as typeof editorState.bgShape.type || 'none';
+  editorState.bgShape.color = g('bg-shape-color')?.value || '#c8a068';
+  editorState.bgShape.opacity = parseInt(g('bg-shape-opacity')?.value || '80');
+  const ov = document.getElementById('bg-shape-opacity-v'); if (ov) ov.textContent = editorState.bgShape.opacity + '%';
+  const layer = document.getElementById('bg-shape-layer');
+  if (!layer) return;
+  const svg = buildBgShapeSVG();
+  layer.innerHTML = svg ? `<div style="position:absolute;inset:0;width:100%;height:100%;">${svg}</div>` : '';
+}
+
+// ============================================================
+// SNAP-TO-GRID GUIDE LINES
+// ============================================================
+function showGuideLines(snapX: number | null, snapY: number | null) {
+  const el = document.getElementById('snap-guides');
+  if (!el) return;
+  let html = '';
+  if (snapX !== null) html += `<div style="position:absolute;left:${snapX}px;top:0;width:1px;height:100%;background:rgba(74,158,255,0.7);pointer-events:none;z-index:99;"></div>`;
+  if (snapY !== null) html += `<div style="position:absolute;top:${snapY}px;left:0;width:100%;height:1px;background:rgba(74,158,255,0.7);pointer-events:none;z-index:99;"></div>`;
+  el.innerHTML = html;
+}
+
+function clearGuideLines() {
+  const el = document.getElementById('snap-guides');
+  if (el) el.innerHTML = '';
+}
 
 function applyTemplate(name: string) {
   const t = TEMPLATES[name];
@@ -1382,7 +1727,7 @@ function applyTemplate(name: string) {
     if (fcEl && t.field_colors[k]) fcEl.value = t.field_colors[k];
   });
 
-  if (name === 'natur' || name === 'klassisk') {
+  if (name === 'natur' || name === 'klassisk' || name === 'romantisk' || name === 'hav' || name === 'midnatt') {
     editorState.fields.intro.italic = true;
     editorState.fields.subtitle.italic = true;
   } else {
@@ -1415,10 +1760,45 @@ function renderModuleOrderUI(triggerSave?: () => void) {
     item.setAttribute('draggable', 'true');
     item.setAttribute('data-key', key);
     item.setAttribute('data-index', String(index));
-    item.innerHTML = `<span class="drag-handle">⠿</span><span class="drag-label">${MODULE_LABELS[key] || key}</span>`;
+    const isHidden = editorState.hiddenModules.includes(key);
+    const labelText = editorState.customLabels[key] || MODULE_LABELS[key] || key;
+    item.innerHTML = `<span class="drag-handle">⠿</span><input class="module-label-input" data-key="${key}" value="${labelText.replace(/"/g, '&quot;')}" style="opacity:${isHidden ? 0.4 : 1};background:none;border:none;border-bottom:1px solid transparent;color:inherit;font:inherit;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;width:120px;cursor:text;padding:0 2px;" /><button class="module-vis-btn" data-key="${key}" title="${isHidden ? 'Vis' : 'Skjul'}" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:14px;padding:0 4px;opacity:${isHidden ? 0.4 : 0.8}">${isHidden ? '🚫' : '👁'}</button>`;
     list.appendChild(item);
   });
   attachDragHandlers(list, triggerSave);
+  list.querySelectorAll('.module-label-input').forEach(inp => {
+    const input = inp as HTMLInputElement;
+    input.addEventListener('mousedown', e => e.stopPropagation());
+    input.addEventListener('focus', () => { input.style.borderBottomColor = 'var(--accent)'; });
+    input.addEventListener('blur', () => {
+      input.style.borderBottomColor = 'transparent';
+      const key = input.getAttribute('data-key')!;
+      const val = input.value.trim();
+      if (val && val !== (MODULE_LABELS[key] || key)) {
+        editorState.customLabels[key] = val;
+      } else {
+        delete editorState.customLabels[key];
+      }
+      if (triggerSave) triggerSave();
+    });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+  });
+  list.querySelectorAll('.module-vis-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = (btn as HTMLElement).getAttribute('data-key')!;
+      const idx = editorState.hiddenModules.indexOf(key);
+      if (idx >= 0) {
+        editorState.hiddenModules.splice(idx, 1);
+      } else {
+        editorState.hiddenModules.push(key);
+      }
+      renderModuleOrderUI(triggerSave);
+      updateAllCardElements();
+      updateDividerElements();
+      if (triggerSave) triggerSave();
+    });
+  });
 }
 
 function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
@@ -1470,12 +1850,14 @@ function attachDragHandlers(list: HTMLElement, triggerSave?: () => void) {
 // FREE-POSITION DRAG SYSTEM
 // ============================================================
 function applyPosition(id: string) {
-  const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
+  const el = id === 'cutout' ? document.getElementById('cutout-img') : id === 'ornament' ? document.getElementById('ornament') : document.getElementById('el-' + id);
   if (!el) return;
   const pos = editorState.positions[id];
   if (!pos) return;
   (el as HTMLElement).style.left = pos.x + 'px';
   (el as HTMLElement).style.top = pos.y + 'px';
+  (el as HTMLElement).style.right = 'auto';
+  (el as HTMLElement).style.bottom = 'auto';
   (el as HTMLElement).style.zIndex = String(pos.z);
 }
 
@@ -1512,7 +1894,7 @@ function selectCardElement(id: string) {
 }
 
 function attachCardDrag(id: string, triggerSave: () => void) {
-  const el = id === 'cutout' ? document.getElementById('cutout-img') : document.getElementById('el-' + id);
+  const el = id === 'cutout' ? document.getElementById('cutout-img') : id === 'ornament' ? document.getElementById('ornament') : document.getElementById('el-' + id);
   if (!el) return;
   const htmlEl = el as HTMLElement;
   let startClientX = 0, startClientY = 0, origX = 0, origY = 0, dragging = false;
@@ -1535,9 +1917,21 @@ function attachCardDrag(id: string, triggerSave: () => void) {
     if (!dragging || !htmlEl.hasPointerCapture(e.pointerId)) return;
     const dx = (e.clientX - startClientX) / currentCardScale;
     const dy = (e.clientY - startClientY) / currentCardScale;
-    editorState.positions[id].x = Math.round(origX + dx);
-    editorState.positions[id].y = Math.round(origY + dy);
+    const rawX = origX + dx;
+    const rawY = origY + dy;
+    const snapThreshold = 10 / currentCardScale;
+    const xSnaps = [0, 20, 40, 186, 279, 373, 519, 539, 559];
+    const ySnaps = [0, 20, 200, 397, 600, 774, 794];
+    Object.entries(editorState.positions).forEach(([otherId, pos]) => {
+      if (otherId !== id) { xSnaps.push(pos.x); ySnaps.push(pos.y); }
+    });
+    let snappedX = rawX, snappedY = rawY, didSnapX = false, didSnapY = false;
+    for (const sp of xSnaps) { if (Math.abs(rawX - sp) < snapThreshold) { snappedX = sp; didSnapX = true; break; } }
+    for (const sp of ySnaps) { if (Math.abs(rawY - sp) < snapThreshold) { snappedY = sp; didSnapY = true; break; } }
+    editorState.positions[id].x = Math.round(snappedX);
+    editorState.positions[id].y = Math.round(snappedY);
     applyPosition(id);
+    showGuideLines(didSnapX ? snappedX : null, didSnapY ? snappedY : null);
     const readout = document.getElementById('pos-readout');
     if (readout) readout.textContent = `${MODULE_LABELS[id] || id}: X ${Math.round(editorState.positions[id].x)} · Y ${Math.round(editorState.positions[id].y)}`;
   });
@@ -1546,12 +1940,13 @@ function attachCardDrag(id: string, triggerSave: () => void) {
     if (!dragging) return;
     dragging = false;
     htmlEl.releasePointerCapture(e.pointerId);
+    clearGuideLines();
     triggerSave();
   });
 }
 
 function attachAllCardDrag(triggerSave: () => void) {
-  ['portrait','topline','divider1','intro','name','subtitle','datebadge','divider2','program','divider3','greeting','rsvp','cutout'].forEach(id => attachCardDrag(id, triggerSave));
+  ['portrait','topline','divider1','intro','name','subtitle','datebadge','divider2','program','divider3','greeting','rsvp','cutout','ornament'].forEach(id => attachCardDrag(id, triggerSave));
 }
 
 function resetLayout() {
@@ -1602,6 +1997,8 @@ function collectState() {
         zoom: g('main-zoom')?.value,
         position: g('main-pos')?.value,
         height: g('main-height')?.value,
+        filter: { ...editorState.portraitFilter },
+        frameType: editorState.portraitFrame,
       },
       cutout: {
         src: editorState.cutoutImage,
@@ -1630,6 +2027,8 @@ function collectState() {
       borderWidth: g('border-width')?.value,
       ornamentVisible: (g('ornament-visible') as HTMLInputElement)?.checked,
       ornamentColor: g('ornament-color')?.value,
+      ornamentOpacity: (g('ornament-opacity') as HTMLInputElement)?.value,
+      ornamentType: g('ornament-type')?.value,
       rsvpBg: g('rsvp-bg')?.value,
       rsvpBorderColor: g('rsvp-border-color')?.value,
       rsvpBorderW: g('rsvp-border-w')?.value,
@@ -1638,11 +2037,36 @@ function collectState() {
       rsvpPadding: g('rsvp-padding')?.value,
       rsvpVisible: (g('rsvp-visible') as HTMLInputElement)?.checked,
       rsvpTransparent: editorState.rsvpTransparent,
+      bgShape: { ...editorState.bgShape },
     },
     removebgKey: g('removebg-key')?.value,
     moduleOrder: [...editorState.moduleOrder],
+    hiddenModules: [...editorState.hiddenModules],
+    customLabels: { ...editorState.customLabels },
     positions: JSON.parse(JSON.stringify(editorState.positions)),
+    moduleWidths: { ...editorState.moduleWidths },
+    moduleAligns: { ...editorState.moduleAligns },
   };
+}
+
+function pushUndo() {
+  undoStack.push(collectState());
+  if (undoStack.length > 20) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function undo() {
+  if (undoStack.length === 0) { showToast('Ingenting å angre'); return; }
+  redoStack.push(collectState());
+  applyProjectData(undoStack.pop() as Record<string, unknown>);
+  showToast('Angret ↩');
+}
+
+function redo() {
+  if (redoStack.length === 0) { showToast('Ingenting å gjøre om'); return; }
+  undoStack.push(collectState());
+  applyProjectData(redoStack.pop() as Record<string, unknown>);
+  showToast('Gjort om ↪');
 }
 
 function applyProjectData(data: Record<string, unknown>) {
@@ -1702,6 +2126,18 @@ function applyProjectData(data: Record<string, unknown>) {
       if (mi.zoom) { g('main-zoom').value = mi.zoom as string; const zv = document.getElementById('main-zoom-v'); if (zv) zv.textContent = mi.zoom + '%'; }
       if (mi.position) { g('main-pos').value = mi.position as string; const pv = document.getElementById('main-pos-v'); if (pv) pv.textContent = mi.position + '%'; }
       updateMainHeight();
+      if (mi.filter) {
+        editorState.portraitFilter = mi.filter as typeof editorState.portraitFilter;
+        const fm = document.getElementById('portrait-filter-mode') as HTMLSelectElement; if (fm) fm.value = editorState.portraitFilter.mode;
+        const fb = g('portrait-filter-brightness'); if (fb) fb.value = String(editorState.portraitFilter.brightness);
+        const fc = g('portrait-filter-contrast'); if (fc) fc.value = String(editorState.portraitFilter.contrast);
+        updatePortraitFilter();
+      }
+      if (mi.frameType) {
+        editorState.portraitFrame = mi.frameType as typeof editorState.portraitFrame;
+        const el = document.getElementById('portrait-frame-type') as HTMLSelectElement; if (el) el.value = mi.frameType as string;
+        updatePortraitFrame();
+      }
     }
 
     const ci = images.cutout;
@@ -1749,6 +2185,8 @@ function applyProjectData(data: Record<string, unknown>) {
     const ov = g('ornament-visible') as HTMLInputElement;
     if (ov) ov.checked = !!c.ornamentVisible;
     if (c.ornamentColor) g('ornament-color').value = c.ornamentColor as string;
+    if (c.ornamentOpacity !== undefined) { g('ornament-opacity').value = c.ornamentOpacity as string; const ov2 = document.getElementById('ornament-opacity-v'); if (ov2) ov2.textContent = c.ornamentOpacity + '%'; }
+    if (c.ornamentType) g('ornament-type').value = c.ornamentType as string;
     if (g('rsvp-bg') && c.rsvpBg) g('rsvp-bg').value = c.rsvpBg as string;
     if (g('rsvp-border-color') && c.rsvpBorderColor) g('rsvp-border-color').value = c.rsvpBorderColor as string;
     if (g('rsvp-border-w') && c.rsvpBorderW !== undefined) { g('rsvp-border-w').value = c.rsvpBorderW as string; const bwv = document.getElementById('rsvp-border-w-v'); if (bwv) bwv.textContent = c.rsvpBorderW + 'px'; }
@@ -1763,11 +2201,25 @@ function applyProjectData(data: Record<string, unknown>) {
     updateFade();
     updateCardBorder();
     updateOrnament();
+    if (c.bgShape) {
+      editorState.bgShape = c.bgShape as typeof editorState.bgShape;
+      const st = document.getElementById('bg-shape-type') as HTMLSelectElement; if (st) st.value = editorState.bgShape.type;
+      const sc = g('bg-shape-color'); if (sc) sc.value = editorState.bgShape.color;
+      const so = g('bg-shape-opacity'); if (so) so.value = String(editorState.bgShape.opacity);
+      updateBgShape();
+    }
   }
 
   if (data.moduleOrder && Array.isArray(data.moduleOrder)) {
     editorState.moduleOrder = data.moduleOrder as string[];
     renderModuleOrderUI();
+  }
+
+  if (Array.isArray(data.hiddenModules)) {
+    editorState.hiddenModules = data.hiddenModules as string[];
+  }
+  if (data.customLabels && typeof data.customLabels === 'object') {
+    editorState.customLabels = data.customLabels as Record<string, string>;
   }
 
   if (data.positions && typeof data.positions === 'object') {
@@ -1778,6 +2230,24 @@ function applyProjectData(data: Record<string, unknown>) {
       }
     });
     applyAllPositions();
+  }
+
+  if (data.moduleWidths && typeof data.moduleWidths === 'object') {
+    const mw = data.moduleWidths as Record<string, number>;
+    Object.keys(mw).forEach(k => {
+      editorState.moduleWidths[k] = mw[k];
+      const el = document.getElementById(`mw-${k}`) as HTMLInputElement;
+      if (el) { el.value = String(mw[k]); const v = document.getElementById(`mw-${k}-v`); if (v) v.textContent = mw[k] + 'px'; }
+    });
+  }
+
+  if (data.moduleAligns && typeof data.moduleAligns === 'object') {
+    const ma = data.moduleAligns as Record<string, string>;
+    Object.keys(ma).forEach(k => {
+      editorState.moduleAligns[k] = ma[k];
+      const el = document.getElementById(`ma-${k}`) as HTMLSelectElement;
+      if (el) el.value = ma[k];
+    });
   }
 
   updateAllCardElements();
@@ -1850,6 +2320,18 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, W, H);
 
+  // ── 1b. Background shape ─────────────────────────────────────
+  if (editorState.bgShape.type !== 'none') {
+    const svgStr = buildBgShapeSVG();
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const svgImg = await loadImg(url);
+      ctx.drawImage(svgImg, 0, 0, W, H);
+    } catch(_) { /* ignore */ }
+    finally { URL.revokeObjectURL(url); }
+  }
+
   // ── 2. Background image ─────────────────────────────────
   if (editorState.bgImage) {
     try {
@@ -1913,10 +2395,32 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
       const imgY = portraitPos.y + (th - scaledH) * posYFrac;
 
       ctx.save();
+      const frameType = editorState.portraitFrame;
+      const portraitX = portraitPos.x;
+      const portraitY = portraitPos.y;
       ctx.beginPath();
-      ctx.rect(portraitPos.x, portraitPos.y, W - portraitPos.x, th);
+      if (frameType === 'round') {
+        const cx = portraitX + W / 2, cy = portraitY + th / 2, r = Math.min(W, th) * 0.46;
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      } else if (frameType === 'oval') {
+        const cx = portraitX + W / 2, cy = portraitY + th / 2;
+        ctx.ellipse(cx, cy, W * 0.47, th * 0.48, 0, 0, Math.PI * 2);
+      } else if (frameType === 'arch') {
+        const r2 = Math.min(W / 2, th * 0.3);
+        ctx.moveTo(portraitX, portraitY + th);
+        ctx.lineTo(portraitX, portraitY + r2);
+        ctx.arcTo(portraitX, portraitY, portraitX + r2, portraitY, r2);
+        ctx.lineTo(portraitX + W - r2, portraitY);
+        ctx.arcTo(portraitX + W, portraitY, portraitX + W, portraitY + r2, r2);
+        ctx.lineTo(portraitX + W, portraitY + th);
+        ctx.closePath();
+      } else {
+        ctx.rect(portraitX, portraitY, W - portraitX, th);
+      }
       ctx.clip();
+      ctx.filter = buildPortraitFilterCSS();
       ctx.drawImage(portImg, imgX, imgY, scaledW, scaledH);
+      ctx.filter = 'none';
       ctx.restore();
     } catch (_e) {
       // ignore portrait load failure
@@ -2026,17 +2530,21 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
   }
 
   // Draw dividers
-  drawDivider('divider1');
-  drawDivider('divider2');
-  drawDivider('divider3');
+  for (const divKey of ['divider1', 'divider2', 'divider3']) {
+    if (!editorState.hiddenModules.includes(divKey)) {
+      drawDivider(divKey);
+    }
+  }
 
   // Draw text fields (all except 'date' which is handled as badge)
   for (const key of ['topline', 'intro', 'name', 'subtitle', 'program', 'greeting', 'rsvp']) {
-    await drawTextField(key);
+    if (!editorState.hiddenModules.includes(key)) {
+      await drawTextField(key);
+    }
   }
 
   // ── 8. Date badge ─────────────────────────────────────────
-  {
+  if (!editorState.hiddenModules.includes('datebadge') && !editorState.hiddenModules.includes('date')) {
     const badgePos = editorState.positions.datebadge || { x: 80, y: 440 };
     const badgeBg = g('badge-bg')?.value || '#8b5a2b';
     const badgeRadius = parseInt(g('badge-radius')?.value || '20');
@@ -2155,7 +2663,80 @@ async function renderCardToCanvas(): Promise<HTMLCanvasElement> {
     }
   }
 
-  // ── 11. Card border overlay ───────────────────────────────
+  // ── 11. Ornament ──────────────────────────────────────────
+  {
+    const ornamentVisible = (g('ornament-visible') as HTMLInputElement)?.checked;
+    if (ornamentVisible) {
+      const c2 = g('ornament-color')?.value || '#c8a068';
+      const ornamentOpacity = parseInt((g('ornament-opacity') as HTMLInputElement)?.value || '80') / 100;
+      const ornamentType = g('ornament-type')?.value || 'flower';
+      const ornamentPos = editorState.positions['ornament'] || { x: 479, y: 674 };
+      const ox = ornamentPos.x;
+      const oy = ornamentPos.y;
+      ctx.save();
+      ctx.globalAlpha = ornamentOpacity;
+      ctx.strokeStyle = c2; ctx.fillStyle = c2;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ox+30, oy+30, 28, 0, Math.PI*2); ctx.stroke();
+
+      if (ornamentType === 'flower') {
+        ctx.globalAlpha = ornamentOpacity * 0.15;
+        ctx.beginPath(); ctx.moveTo(ox+30,oy+8); ctx.bezierCurveTo(ox+20,oy+14,ox+10,oy+22,ox+10,oy+30); ctx.bezierCurveTo(ox+10,oy+42,ox+20,oy+52,ox+30,oy+52); ctx.bezierCurveTo(ox+40,oy+52,ox+50,oy+42,ox+50,oy+30); ctx.bezierCurveTo(ox+50,oy+22,ox+40,oy+14,ox+30,oy+8); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.4;
+        ctx.save(); ctx.translate(ox+22,oy+26); ctx.rotate(-25*Math.PI/180); ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(ox+38,oy+26); ctx.rotate(25*Math.PI/180); ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.beginPath(); ctx.ellipse(ox+30,oy+36,6,8,0,0,Math.PI*2); ctx.fill();
+
+      } else if (ornamentType === 'lily') {
+        ctx.globalAlpha = ornamentOpacity * 0.5;
+        ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+24,oy+16,ox+24,oy+24,ox+24,oy+28); ctx.bezierCurveTo(ox+24,oy+34,ox+27,oy+38,ox+30,oy+40); ctx.bezierCurveTo(ox+33,oy+38,ox+36,oy+34,ox+36,oy+28); ctx.bezierCurveTo(ox+36,oy+24,ox+36,oy+16,ox+30,oy+10); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.35;
+        ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+22,oy+14,ox+16,oy+18,ox+14,oy+26); ctx.bezierCurveTo(ox+11,oy+32,ox+13,oy+38,ox+16,oy+41); ctx.bezierCurveTo(ox+20,oy+38,ox+24,oy+34,ox+26,oy+28); ctx.bezierCurveTo(ox+28,oy+22,ox+30,oy+10,ox+30,oy+10); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(ox+30,oy+10); ctx.bezierCurveTo(ox+38,oy+14,ox+44,oy+18,ox+46,oy+26); ctx.bezierCurveTo(ox+49,oy+32,ox+47,oy+38,ox+44,oy+41); ctx.bezierCurveTo(ox+40,oy+38,ox+36,oy+34,ox+34,oy+28); ctx.bezierCurveTo(ox+32,oy+22,ox+30,oy+10,ox+30,oy+10); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.6;
+        ctx.beginPath(); ctx.arc(ox+30,oy+41,4,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.5;
+        ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ox+30,oy+45); ctx.lineTo(ox+30,oy+52); ctx.stroke();
+
+      } else if (ornamentType === 'crown') {
+        ctx.globalAlpha = ornamentOpacity * 0.35;
+        ctx.beginPath(); ctx.moveTo(ox+10,oy+40); ctx.lineTo(ox+10,oy+22); ctx.lineTo(ox+18,oy+32); ctx.lineTo(ox+30,oy+14); ctx.lineTo(ox+42,oy+32); ctx.lineTo(ox+50,oy+22); ctx.lineTo(ox+50,oy+40); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.5;
+        ctx.beginPath(); ctx.rect(ox+10,oy+40,40,5); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.7;
+        ctx.beginPath(); ctx.arc(ox+10,oy+22,2.5,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ox+30,oy+14,2.5,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ox+50,oy+22,2.5,0,Math.PI*2); ctx.fill();
+
+      } else if (ornamentType === 'heart') {
+        ctx.globalAlpha = ornamentOpacity * 0.4;
+        ctx.beginPath(); ctx.moveTo(ox+30,oy+46); ctx.bezierCurveTo(ox+20,oy+40,ox+10,oy+34,ox+10,oy+22); ctx.bezierCurveTo(ox+10,oy+15,ox+16,oy+10,ox+22,oy+12); ctx.bezierCurveTo(ox+26,oy+13,ox+29,oy+17,ox+30,oy+20); ctx.bezierCurveTo(ox+31,oy+17,ox+34,oy+13,ox+38,oy+12); ctx.bezierCurveTo(ox+44,oy+10,ox+50,oy+15,ox+50,oy+22); ctx.bezierCurveTo(ox+50,oy+34,ox+40,oy+40,ox+30,oy+46); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = ornamentOpacity * 0.2;
+        ctx.beginPath(); ctx.moveTo(ox+30,oy+40); ctx.bezierCurveTo(ox+20,oy+34,ox+16,oy+28,ox+16,oy+22); ctx.bezierCurveTo(ox+16,oy+18,ox+19,oy+15,ox+22,oy+16); ctx.bezierCurveTo(ox+25,oy+17,ox+28,oy+20,ox+30,oy+24); ctx.bezierCurveTo(ox+32,oy+20,ox+35,oy+17,ox+38,oy+16); ctx.bezierCurveTo(ox+41,oy+15,ox+44,oy+18,ox+44,oy+22); ctx.bezierCurveTo(ox+44,oy+28,ox+40,oy+34,ox+30,oy+40); ctx.closePath(); ctx.fill();
+
+      } else if (ornamentType === 'wreath') {
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = ornamentOpacity * 0.4;
+        ctx.beginPath(); ctx.arc(ox+30,oy+30,16,0,Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = ornamentOpacity * 0.35;
+        ctx.beginPath(); ctx.ellipse(ox+14,oy+30,5,8,0,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(ox+46,oy+30,5,8,0,0,Math.PI*2); ctx.fill();
+        ctx.save(); ctx.translate(ox+30,oy+14); ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.ellipse(0,0,5,8,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(ox+30,oy+46); ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.ellipse(0,0,5,8,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.globalAlpha = ornamentOpacity * 0.25;
+        ctx.save(); ctx.translate(ox+18,oy+18); ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(ox+42,oy+18); ctx.rotate(-Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(ox+18,oy+42); ctx.rotate(-Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(ox+42,oy+42); ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0,4,7,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.globalAlpha = ornamentOpacity * 0.6;
+        ctx.beginPath(); ctx.arc(ox+30,oy+30,3,0,Math.PI*2); ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // ── 12. Card border overlay ───────────────────────────────
   {
     const borderStyle = g('border-style')?.value || 'none';
     const borderColor = g('border-color')?.value || '#c8a068';
@@ -2243,4 +2824,19 @@ async function downloadPDF() {
   } catch (e) {
     showToast('PDF-feil: ' + (e as Error).message);
   }
+}
+
+// ============================================================
+// EMOJI PICKER COMPONENT
+// ============================================================
+const EMOJI_LIST = ['✝️','🎉','📍','📞','❤️','✨','🙏','🌿','⚓','🌸','🎊','📅','🕐','🎶','★','†','•','—','«','»','☀️','🌙','🕊️','🌺'];
+
+function EmojiPicker({ onInsert }: { onInsert: (e: string) => void }) {
+  return (
+    <div style={{display:'flex',flexWrap:'wrap',gap:'3px',padding:'8px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'6px',marginTop:'4px'}}>
+      {EMOJI_LIST.map(e => (
+        <button key={e} onClick={() => onInsert(e)} style={{fontSize:'15px',background:'none',border:'none',cursor:'pointer',padding:'3px 5px',borderRadius:'4px',lineHeight:1}} title={e}>{e}</button>
+      ))}
+    </div>
+  );
 }
