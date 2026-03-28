@@ -1868,23 +1868,41 @@ function loadProject() {
   }
 }
 
-// Export helpers
+// Export helpers — deep-clone the card, place it offscreen at 1:1, capture it
 async function captureCard(): Promise<HTMLCanvasElement> {
   document.querySelectorAll('.card-el.selected').forEach(e => e.classList.remove('selected'));
-  const wrapper = document.getElementById('card-wrapper');
+
   const card = document.getElementById('invite-card') as HTMLElement;
-  // Temporarily reset scale so html2canvas sees the card at 1:1
-  const prevTransform = wrapper?.style.transform || '';
-  const prevMarginTop = wrapper?.style.marginTop || '';
-  if (wrapper) { wrapper.style.transform = 'scale(1)'; wrapper.style.marginTop = '0'; }
-  await new Promise(r => setTimeout(r, 50)); // let browser repaint
-  const canvas = await html2canvas(card, {
+
+  // Deep clone the card
+  const clone = card.cloneNode(true) as HTMLElement;
+
+  // Style the clone: full size, offscreen, no transform
+  clone.style.position = 'fixed';
+  clone.style.top = '-9999px';
+  clone.style.left = '-9999px';
+  clone.style.width = '559px';
+  clone.style.height = '794px';
+  clone.style.transform = 'none';
+  clone.style.overflow = 'hidden';
+
+  // Remove placeholder and any selection outlines from clone
+  const ph = clone.querySelector('#el-portrait-placeholder') as HTMLElement | null;
+  if (ph) ph.style.display = 'none';
+  clone.querySelectorAll('.selected').forEach(e => e.classList.remove('selected'));
+  clone.querySelectorAll('input[type="file"]').forEach(e => (e as HTMLElement).style.display = 'none');
+
+  document.body.appendChild(clone);
+  await new Promise(r => setTimeout(r, 80));
+
+  const canvas = await html2canvas(clone, {
     scale: 2, useCORS: true, allowTaint: true,
-    backgroundColor: null, width: 559, height: 794,
+    backgroundColor: null,
+    width: 559, height: 794,
     x: 0, y: 0,
   });
-  // Restore scale
-  if (wrapper) { wrapper.style.transform = prevTransform; wrapper.style.marginTop = prevMarginTop; }
+
+  document.body.removeChild(clone);
   return canvas;
 }
 
