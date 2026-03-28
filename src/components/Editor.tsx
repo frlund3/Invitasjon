@@ -34,13 +34,13 @@ function buildFontOptions(selectedFont: string) {
 
 const TEMPLATES: Record<string, {
   bgColor: string; fadeColor: string; badgeBg: string; dividerColor: string;
-  borderColor: string; grassColor: string;
+  borderColor: string;
   fonts: Record<string, string>; sizes: Record<string, number>;
   field_colors: Record<string, string>; rsvpBg: string; rsvpBorderColor: string;
 }> = {
   stadion: {
     bgColor: '#0d1b2a', fadeColor: '#0d1b2a', badgeBg: '#c9a432',
-    dividerColor: '#c9a432', borderColor: '#c9a432', grassColor: '#1a4a0e',
+    dividerColor: '#c9a432', borderColor: '#c9a432',
     fonts: { topline: 'Oswald', intro: 'Lato', name: 'Playfair Display', subtitle: 'Lato', date: 'Oswald', program: 'Lato', greeting: 'Playfair Display', rsvp: 'Lato' },
     sizes: { topline: 10, intro: 13, name: 36, subtitle: 13, date: 13, program: 12, greeting: 20, rsvp: 11 },
     field_colors: { topline: '#c9a432', intro: '#a0a8c0', name: '#e8eaf8', subtitle: '#c9a432', date: '#0d1b2a', program: '#c0c8e0', greeting: '#c9a432', rsvp: '#e0e4f0' },
@@ -48,7 +48,7 @@ const TEMPLATES: Record<string, {
   },
   klassisk: {
     bgColor: '#faf8f4', fadeColor: '#faf8f4', badgeBg: '#1a3a6e',
-    dividerColor: '#1a3a6e', borderColor: '#1a3a6e', grassColor: '#2d6b1a',
+    dividerColor: '#1a3a6e', borderColor: '#1a3a6e',
     fonts: { topline: 'Cinzel', intro: 'Cormorant Garamond', name: 'Playfair Display', subtitle: 'Cormorant Garamond', date: 'Cinzel', program: 'Cormorant Garamond', greeting: 'Playfair Display', rsvp: 'Cormorant Garamond' },
     sizes: { topline: 11, intro: 15, name: 38, subtitle: 15, date: 12, program: 13, greeting: 22, rsvp: 12 },
     field_colors: { topline: '#1a3a6e', intro: '#3a3a5e', name: '#1a1a2e', subtitle: '#1a3a6e', date: '#ffffff', program: '#2a2a4e', greeting: '#1a3a6e', rsvp: '#1a1a2e' },
@@ -56,7 +56,7 @@ const TEMPLATES: Record<string, {
   },
   natur: {
     bgColor: '#fdf6ec', fadeColor: '#fdf6ec', badgeBg: '#8b5a2b',
-    dividerColor: '#c8a068', borderColor: '#c8a068', grassColor: '#2d8a1b',
+    dividerColor: '#c8a068', borderColor: '#c8a068',
     fonts: { topline: 'Oswald', intro: 'EB Garamond', name: 'Playfair Display', subtitle: 'EB Garamond', date: 'Lato', program: 'EB Garamond', greeting: 'Dancing Script', rsvp: 'Lato' },
     sizes: { topline: 11, intro: 14, name: 38, subtitle: 15, date: 13, program: 12, greeting: 22, rsvp: 11 },
     field_colors: { topline: '#8b5a2b', intro: '#5a3a1a', name: '#2c1a0e', subtitle: '#8b5a2b', date: '#ffffff', program: '#3a2010', greeting: '#8b5a2b', rsvp: '#2c1a0e' },
