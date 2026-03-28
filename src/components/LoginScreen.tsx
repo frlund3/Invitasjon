@@ -7,9 +7,9 @@ export default function LoginScreen() {
   const [error, setError] = useState(false);
   const [shaking, setShaking] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await login(password);
+    const ok = login(password);
     if (!ok) {
       setError(true);
       setShaking(true);
