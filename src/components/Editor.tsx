@@ -169,6 +169,8 @@ export default function Editor() {
     w.updateBgImage = updateBgImage;
     w.removeBackgroundAPI = removeBackgroundAPI;
     w.removeBackgroundCanvas = removeBackgroundCanvas;
+    w.removeBackgroundSmartFill = removeBackgroundSmartFill;
+    w.resetCutoutToOriginal = resetCutoutToOriginal;
     w.pickBgColor = pickBgColor;
     w.updateCardBg = updateCardBg;
     w.updateFade = updateFade;
@@ -269,26 +271,37 @@ export default function Editor() {
 
             <div className="accordion">
               <div className="accordion-header" onClick={(e) => toggleAccordion(e.currentTarget)}>
-                <span className="acc-title">Fjern bakgrunn</span><span className="chevron">▼</span>
+                <span className="acc-title">Fjern bakgrunn (gratis)</span><span className="chevron">▼</span>
               </div>
               <div className="accordion-body">
-                <div className="ctrl-block">
-                  <label>remove.bg API-nøkkel</label>
-                  <input type="password" id="removebg-key" placeholder="Din API-nøkkel..." onInput={(e) => localStorage.setItem('removebg_key', (e.target as HTMLInputElement).value)} />
+                <div style={{padding:'6px 14px 4px',fontSize:'10px',color:'var(--text-muted)',lineHeight:'1.5'}}>
+                  Ingen betalt tjeneste nødvendig. Fungerer best på bilder med ensfarget bakgrunn (studio, hvit vegg, blå himmel o.l.).
                 </div>
-                <div style={{padding:'4px 14px'}}>
-                  <button className="btn btn-secondary btn-full" onClick={removeBackgroundAPI}>Fjern bakgrunn (remove.bg)</button>
-                </div>
-                <div className="sep"></div>
-                <div className="ctrl-block" style={{fontSize:'10px',color:'var(--text-muted)',padding:'4px 14px'}}>Manuell fjerning (canvas)</div>
                 <div className="ctrl-row">
                   <label>Toleranse</label>
                   <input type="range" id="bg-tolerance" min="5" max="120" defaultValue="40" />
                   <span className="val-display" id="bg-tolerance-v">40</span>
                 </div>
-                <div style={{padding:'4px 14px',display:'flex',gap:'6px'}}>
-                  <button className="btn btn-secondary" style={{flex:1,fontSize:'10px'}} onClick={removeBackgroundCanvas}>Fjern (hjørne)</button>
-                  <button className="btn btn-secondary" style={{flex:1,fontSize:'10px'}} onClick={pickBgColor}>Velg farge</button>
+                <div style={{padding:'4px 14px 6px',display:'flex',gap:'6px',flexDirection:'column'}}>
+                  <button className="btn btn-primary btn-full" onClick={removeBackgroundSmartFill} style={{fontSize:'11px'}}>
+                    ✂ Fjern bakgrunn (alle hjørner)
+                  </button>
+                  <button className="btn btn-secondary btn-full" onClick={pickBgColor} style={{fontSize:'11px'}}>
+                    🎨 Klikk på bakgrunnsfargen
+                  </button>
+                  <button className="btn btn-secondary btn-full" onClick={resetCutoutToOriginal} style={{fontSize:'11px'}}>
+                    ↩ Tilbakestill original
+                  </button>
+                </div>
+                <div className="sep"></div>
+                <div style={{padding:'4px 14px',fontSize:'10px',color:'var(--text-muted)'}}>
+                  For kompleks bakgrunn (gressbane, menneskemengde): last opp et bilde der du allerede har fjernet bakgrunnen i Canva, Photoshop eller iPhone (lang-trykk på motivet).
+                </div>
+                <div className="sep"></div>
+                <div className="ctrl-block">
+                  <label>remove.bg API-nøkkel (valgfritt)</label>
+                  <input type="password" id="removebg-key" placeholder="Har du API-nøkkel?" onInput={(e) => localStorage.setItem('removebg_key', (e.target as HTMLInputElement).value)} />
+                  <button className="btn btn-secondary btn-full" onClick={removeBackgroundAPI} style={{marginTop:'4px',fontSize:'10px'}}>Fjern via remove.bg</button>
                 </div>
               </div>
             </div>
@@ -930,6 +943,60 @@ async function removeBackgroundAPI() {
   } catch (e) {
     showToast('Feil: ' + (e as Error).message);
   }
+}
+
+// Smart fill: sample all 4 corners + a few edge midpoints, remove all matching pixels
+function removeBackgroundSmartFill() {
+  if (!editorState.cutoutOriginalSrc) { showToast('Last opp cutout-bilde først'); return; }
+  const tolerance = parseInt(g('bg-tolerance')?.value || '40');
+  const img = document.getElementById('cutout-img') as HTMLImageElement;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || 400; canvas.height = img.naturalHeight || 400;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const w = canvas.width, h = canvas.height;
+
+  // Sample multiple seed points from edges
+  const seedPoints = [
+    [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
+    [Math.floor(w / 2), 0], [Math.floor(w / 2), h - 1],
+    [0, Math.floor(h / 2)], [w - 1, Math.floor(h / 2)],
+  ];
+
+  // Collect reference bg colors from seeds
+  const bgColors: [number, number, number][] = seedPoints.map(([sx, sy]) => {
+    const idx = (sy * w + sx) * 4;
+    return [data[idx], data[idx + 1], data[idx + 2]];
+  });
+
+  // For each pixel, check if it matches ANY seed color within tolerance
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], gv = data[i + 1], b = data[i + 2];
+    const matchesAny = bgColors.some(([bgR, bgG, bgB]) =>
+      Math.sqrt((r - bgR) ** 2 + (gv - bgG) ** 2 + (b - bgB) ** 2) < tolerance
+    );
+    if (matchesAny) data[i + 3] = 0;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  const result = canvas.toDataURL('image/png');
+  editorState.cutoutImage = result;
+  img.src = result;
+  const thumb = document.getElementById('cutout-thumb') as HTMLImageElement;
+  if (thumb) thumb.src = result;
+  showToast('Bakgrunn fjernet! Prøv "Tilbakestill" og juster toleranse om nødvendig.');
+}
+
+function resetCutoutToOriginal() {
+  if (!editorState.cutoutOriginalSrc) { showToast('Ingen original å tilbakestille til'); return; }
+  editorState.cutoutImage = editorState.cutoutOriginalSrc;
+  const img = document.getElementById('cutout-img') as HTMLImageElement;
+  img.src = editorState.cutoutOriginalSrc; img.style.display = 'block';
+  const thumb = document.getElementById('cutout-thumb') as HTMLImageElement;
+  if (thumb) { thumb.src = editorState.cutoutOriginalSrc; thumb.classList.remove('empty'); }
+  showToast('Original gjenopprettet!');
 }
 
 function removeBackgroundCanvas() {
