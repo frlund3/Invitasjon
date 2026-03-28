@@ -1522,6 +1522,8 @@ async function loadBgImage(event: Event) {
   editorState.bgImage = dataURL;
   const thumb = document.getElementById('bg-thumb') as HTMLImageElement;
   thumb.src = dataURL; thumb.classList.remove('empty');
+  const bgRemoveBtn = document.getElementById('bg-remove-btn');
+  if (bgRemoveBtn) bgRemoveBtn.style.display = '';
   updateBgImage();
 }
 
@@ -1531,6 +1533,8 @@ function removeBgImage() {
   if (layer) layer.style.backgroundImage = 'none';
   const thumb = document.getElementById('bg-thumb');
   if (thumb) thumb.classList.add('empty');
+  const bgRemoveBtn = document.getElementById('bg-remove-btn');
+  if (bgRemoveBtn) bgRemoveBtn.style.display = 'none';
   const upload = g('bg-upload');
   if (upload) upload.value = '';
 }
@@ -2569,6 +2573,7 @@ function applyProjectData(data: Record<string, unknown>) {
         if (ph) ph.style.display = 'none';
         const thumb = document.getElementById('main-thumb') as HTMLImageElement;
         thumb.src = mi.src as string; thumb.classList.remove('empty');
+        const btn = document.getElementById('main-remove-btn'); if (btn) btn.style.display = '';
       }
       if (mi.height) { g('main-height').value = mi.height as string; const hv = document.getElementById('main-height-v'); if (hv) hv.textContent = mi.height + 'px'; }
       if (mi.zoom) { g('main-zoom').value = mi.zoom as string; const zv = document.getElementById('main-zoom-v'); if (zv) zv.textContent = mi.zoom + '%'; }
